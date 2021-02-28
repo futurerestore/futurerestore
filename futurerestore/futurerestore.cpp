@@ -1240,7 +1240,7 @@ char *futurerestore::getLatestFirmwareUrl(){
 
 void futurerestore::loadLatestBaseband(){
     char * manifeststr = getLatestManifest();
-    char *pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceModelNoCopy(), 0);
+    char *pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), 0);
     info("downloading Baseband\n\n");
     retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, _basebandPath = BASEBAND_TMP_PATH), "could not download baseband\n");
     saveStringToFile(manifeststr, BASEBAND_MANIFEST_TMP_PATH);
@@ -1250,7 +1250,7 @@ void futurerestore::loadLatestBaseband(){
 
 void futurerestore::loadLatestSep(){
     char * manifeststr = getLatestManifest();
-    char *pathStr = getPathOfElementInManifest("SEP", manifeststr, getDeviceModelNoCopy(), 0);
+    char *pathStr = getPathOfElementInManifest("SEP", manifeststr, getDeviceBoardNoCopy(), 0);
     info("downloading SEP\n\n");
     retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, SEP_TMP_PATH), "could not download SEP\n");
     loadSep(SEP_TMP_PATH);
@@ -1407,13 +1407,13 @@ plist_t futurerestore::loadPlistFromFile(const char *path){
     return ret;
 }
 
-char *futurerestore::getPathOfElementInManifest(const char *element, const char *manifeststr, const char *model, int isUpdateInstall){
+char *futurerestore::getPathOfElementInManifest(const char *element, const char *manifeststr, const char *boardConfig, int isUpdateInstall){
     char *pathStr = NULL;
     ptr_smart<plist_t> buildmanifest(NULL,plist_free);
     
     plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
     
-    if (plist_t identity = getBuildidentity(buildmanifest._p, model, isUpdateInstall))
+    if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall))
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest"))
             if (plist_t elem = plist_dict_get_item(manifest, element))
                 if (plist_t info = plist_dict_get_item(elem, "Info"))
