@@ -1535,7 +1535,7 @@ void futurerestore::downloadLatestVeridian(){
 
 void futurerestore::downloadLatestFirmwareComponents(){
     info("Downloading the latest firmware components...\n");
-    mkdir(FIRMWARES_TMP_PATH, 0755);
+    __mkdir(FIRMWARES_TMP_PATH, 0755);
     char zip_name[PATH_MAX];
     char *tmp = FIRMWARES_TMP_PATH;
     sprintf(zip_name, "%s/%s", FUTURERESTORE_TMP_PATH, "Firmwares.ipsw");
