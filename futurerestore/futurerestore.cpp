@@ -163,11 +163,13 @@ void futurerestore::setAutoboot(bool val){
     retassure(_didInit, "did not init\n");
 
     retassure(getDeviceMode(false) == MODE_RECOVERY, "can't set auto-boot, when device isn't in recovery mode\n");
-    retassure(!_client->recovery && recovery_client_new(_client),"Could not connect to device in recovery mode.\n");
+    if(!_client->recovery){
+        retassure(!recovery_client_new(_client),"Could not connect to device in recovery mode.\n");
+    }
     retassure(!recovery_set_autoboot(_client, val),"Setting auto-boot failed?!\n");
 }
 
-void futurerestore::exitRecovery() {
+void futurerestore::exitRecovery(){
     setAutoboot(true);
     recovery_send_reset(_client);
     recovery_client_free(_client);
