@@ -1323,7 +1323,7 @@ static void zip_directory(const std::string& inputdir, const std::string& output
 
 void futurerestore::downloadLatestRose(){
     char * manifeststr = getLatestManifest();
-    char *roseStr = (elemExists("Rap,RTKitOS", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Rap,RTKitOS", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
+    char *roseStr = (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
     if(roseStr) {
         info("downloading Rose firmware\n\n");
         char roseStr1[PATH_MAX];
@@ -1341,7 +1341,7 @@ void futurerestore::downloadLatestRose(){
 
 void futurerestore::downloadLatestSE(){
     char * manifeststr = getLatestManifest();
-    char *seStr = (elemExists("SE,UpdatePayload", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("SE,UpdatePayload", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
+    char *seStr = (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
     if(seStr) {
         info("downloading SE firmware\n\n");
         char seStr1[PATH_MAX];
@@ -1359,16 +1359,16 @@ void futurerestore::downloadLatestSE(){
 
 void futurerestore::downloadLatestSavage(){
     char * manifeststr = getLatestManifest();
-    char *savageB0DevStr = (elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB0DevVTStr = (elemExists("Savage,B0-Dev-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Dev-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB0ProdStr = (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB0ProdVTStr = (elemExists("Savage,B0-Prod-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Prod-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB2DevStr = (elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB2DevVTStr = (elemExists("Savage,B2-Dev-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Dev-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB2ProdStr = (elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageB2ProdVTStr = (elemExists("Savage,B2-Prod-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Prod-PatchVT", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageBADevStr = (elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *savageBAProdStr = (elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
+    char *savageB0DevStr = (elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB0DevVTStr = (elemExists("Savage,B0-Dev-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Dev-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB0ProdStr = (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB0ProdVTStr = (elemExists("Savage,B0-Prod-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B0-Prod-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB2DevStr = (elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB2DevVTStr = (elemExists("Savage,B2-Dev-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Dev-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB2ProdStr = (elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageB2ProdVTStr = (elemExists("Savage,B2-Prod-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,B2-Prod-PatchVT", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageBADevStr = (elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *savageBAProdStr = (elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
     if(savageB0DevStr) {
         info("downloading Savage,B0-Dev-Patch\n\n");
         char savageB0DevStr1[PATH_MAX];
@@ -1503,8 +1503,8 @@ void futurerestore::downloadLatestSavage(){
 
 void futurerestore::downloadLatestVeridian(){
     char * manifeststr = getLatestManifest();
-    char *veridianStr = (elemExists("BMU,DigestMap", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
-    char *veridianFWMStr = (elemExists("BMU,FirmwareMap", manifeststr, getDeviceModelNoCopy(), 0) ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceModelNoCopy(), 0) : NULL);
+    char *veridianStr = (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
+    char *veridianFWMStr = (elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0) : NULL);
     if(veridianStr) {
         info("downloading Veridian DigestMap\n\n");
         char veridianStr1[PATH_MAX];
@@ -1554,7 +1554,7 @@ void futurerestore::downloadLatestFirmwareComponents(){
 
 void futurerestore::loadLatestBaseband(){
     char * manifeststr = getLatestManifest();
-    char *pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceModelNoCopy(), 0);
+    char *pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), 0);
     info("downloading Baseband\n\n");
     retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, _basebandPath = BASEBAND_TMP_PATH), "could not download baseband\n");
     saveStringToFile(manifeststr, BASEBAND_MANIFEST_TMP_PATH);
@@ -1564,7 +1564,7 @@ void futurerestore::loadLatestBaseband(){
 
 void futurerestore::loadLatestSep(){
     char * manifeststr = getLatestManifest();
-    char *pathStr = getPathOfElementInManifest("SEP", manifeststr, getDeviceModelNoCopy(), 0);
+    char *pathStr = getPathOfElementInManifest("SEP", manifeststr, getDeviceBoardNoCopy(), 0);
     info("downloading SEP\n\n");
     retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, SEP_TMP_PATH), "could not download SEP\n");
     loadSep(SEP_TMP_PATH);
@@ -1721,13 +1721,13 @@ plist_t futurerestore::loadPlistFromFile(const char *path){
     return ret;
 }
 
-char *futurerestore::getPathOfElementInManifest(const char *element, const char *manifeststr, const char *model, int isUpdateInstall){
+char *futurerestore::getPathOfElementInManifest(const char *element, const char *manifeststr, const char *boardConfig, int isUpdateInstall){
     char *pathStr = NULL;
     ptr_smart<plist_t> buildmanifest(NULL,plist_free);
     
     plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
     
-    if (plist_t identity = getBuildidentity(buildmanifest._p, model, isUpdateInstall))
+    if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall))
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest"))
             if (plist_t elem = plist_dict_get_item(manifest, element))
                 if (plist_t info = plist_dict_get_item(elem, "Info"))
@@ -1740,13 +1740,13 @@ noerror:
     return pathStr;
 }
 
-bool futurerestore::elemExists(const char *element, const char *manifeststr, const char *model, int isUpdateInstall){
+bool futurerestore::elemExists(const char *element, const char *manifeststr, const char *boardConfig, int isUpdateInstall){
     char *pathStr = NULL;
     ptr_smart<plist_t> buildmanifest(NULL,plist_free);
     
     plist_from_xml(manifeststr, (uint32_t)strlen(manifeststr), &buildmanifest);
     
-    if (plist_t identity = getBuildidentity(buildmanifest._p, model, isUpdateInstall))
+    if (plist_t identity = getBuildidentityWithBoardconfig(buildmanifest._p, boardConfig, isUpdateInstall))
         if (plist_t manifest = plist_dict_get_item(identity, "Manifest"))
             if (plist_t elem = plist_dict_get_item(manifest, element))
                 if (plist_t info = plist_dict_get_item(elem, "Info"))
