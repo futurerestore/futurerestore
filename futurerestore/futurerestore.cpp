@@ -458,7 +458,7 @@ if (_client->image4supported) {
     }
 
     irecv_device_event_subscribe(&_client->irecv_e_ctx, irecv_event_cb, _client);
-    idevice_event_subscribe(idevice_event_cb, _client);
+    //idevice_event_subscribe(idevice_event_cb, _client);
     
     int mode = 0;
     libipatcher::fw_key iBSSKeys;
