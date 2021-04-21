@@ -448,6 +448,8 @@ pair<ptr_smart<char*>, size_t> getIPSWComponent(struct idevicerestore_client_t* 
 }
 
 void futurerestore::enterPwnRecovery(plist_t build_identity, string bootargs){
+    bootargs = "rd=md0 -restore -v debug=0x14e serial=3";
+
 #ifndef HAVE_LIBIPATCHER
     reterror("compiled without libipatcher");
 #else
