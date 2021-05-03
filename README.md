@@ -158,7 +158,7 @@ Use jailbreak tools for setting boot-nonce generator:
 ## 2) Prometheus (64-bit device) - ApNonce collision method (Recovery mode)
 ### Requirements
 - **Device with A7 chip on iOS 9.1 - 10.2 or iOS 10.3 beta 1**;
-- Jailbreak doesn't required;
+- Jailbreak is not required;
 - Signing ticket files (`.shsh`, `.shsh2`, `.plist`) with a customly chosen ApNonce;
 - Signing ticket files needs to have one of the ApNonces, which the device generates a lot;
 
