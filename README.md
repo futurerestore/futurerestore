@@ -72,7 +72,7 @@ Usage: `futurerestore [OPTIONS] iPSW`
 # 1) Prometheus (64-bit device) - APNonce recreation with generator method
 
 ### You can only downgrade if:
-*  the destination firmware version is compatible with the latest signed SEP and baseband. Check whether your version is compatible [here.](#firmware-signing-info)
+*  the destination firmware version is compatible with a currently signed SEP and baseband. Check whether your version is compatible [here.](#firmware-signing-info)
 *  if you have a signing tickets files with a generator for **that specific firmware version.**
 
 
@@ -292,4 +292,3 @@ If you have **signing ticket files for iOS 9.x**, which **do not contain a ApNon
 ## Report an issue
 Before you report an issue, please check that it is not mentioned in the [Common Issues section](#common-issues).
 If it is not, you can report your issue [here](https://github.com/m1stadev/futurerestore/issues).
-
