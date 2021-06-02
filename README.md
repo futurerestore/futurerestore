@@ -259,7 +259,8 @@ You can downgrade if the destination firmware version, if it is compatible with 
 - **64-bit**: Signing ticket files (`.shsh`, `.shsh2`, `.plist`) for the destination firmware (OTA blobs work too!).
 
 ### Info
-If you have a jailbroken device, you can downgrade to **any** firmware version you have blobs for, as long as the [baseband](#firmware-signing-info) is compatible, SEP does not have to be compatible
+If you have a jailbroken device, you can downgrade to **any** firmware version you have blobs for, as long as the [baseband](#firmware-signing-info) is compatible, SEP does not have to be compatible.
+
 You can still get OTA blobs for iOS 6.1.3, 8.4.1 or 10.3.3 for some devices and use those.
 
 ### How to use
@@ -276,17 +277,20 @@ You can still get OTA blobs for iOS 6.1.3, 8.4.1 or 10.3.3 for some devices and 
 
 ## 5) iOS 9.x re-restore bug by @alitek123 (only for 32-bit devices)
 ### Requirements
-- Jailbreak doesn't required;
+- Jailbreak isn't required;
 - Signing ticket files (`.shsh`, `.shsh2`, `.plist`) from by iOS 9.x without ApNonce (noNonce APTickets)
 
 ### Info
-If you have **signing tickets files for iOS 9.x**, which **do not contain a ApNonce**, you can restore to that firmware.
+If you have **signing ticket files for iOS 9.x**, which **do not contain a ApNonce**, you can restore to that firmware.
 
 ### How to use
 1. Connect your device in DFU mode
 2. On the computer run `futurerestore -t ticket.shsh --latest-baseband ios9.ipsw`
+
+---
+
 ## Report an issue
-Before you report an issue, please check that it is not mentioned in the [Common Issues section](#common-issues) 
+Before you report an issue, please check that it is not mentioned in the [Common Issues section](#common-issues).
 If it is not, you can report another issue [here](https://github.com/marijuanARM/futurerestore/issues).
 
 
