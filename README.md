@@ -225,7 +225,7 @@ one to speed up the process: `futurerestore -w -t t1.shsh -t t2.shsh -t t3.shsh 
 - __[img4tool](https://github.com/tihmstar/img4tool) can't be used for Windows [problem with signing iBSS/iBEC], now it's TO-DO;__
 
 ### Info
-You can downgrade if the destination firmware version, if it is compatible with the [latest sep and baseband!](#firmware-signing-info). You also need to have **special signing ticket files**. If you don't know what this is, you probably can **NOT** use this method!
+You can downgrade if the destination firmware version, if it is compatible with the [latest SEP and baseband](#firmware-signing-info). You also need to have **special signing ticket files**. If you don't know what this is, you probably can **NOT** use this method!
 
 ### How to use
 1. Connect your device in DFU mode;
