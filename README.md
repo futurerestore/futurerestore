@@ -72,7 +72,7 @@ Usage: `futurerestore [OPTIONS] iPSW`
 # 1) Prometheus (64-bit device) - APNonce recreation with generator method
 
 ### You can only downgrade if:
-*  the destination firmware version is compatible with the latest signed SEP and baseband. Check whether your version is compatible [here.](#-firmware-signing-info)
+*  the destination firmware version is compatible with the latest signed SEP and baseband. Check whether your version is compatible [here.](#firmware-signing-info)
 *  if you have a signing tickets files with a generator for **that specific firmware version.**
 
 
