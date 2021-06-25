@@ -151,7 +151,9 @@ A7 and A8: 11.3-12.5.4
 
 A9 and A10: 14.0-14.6
 
-A11 devices and newer: 14.3-14.6
+A11 devices: 14.3-14.6
+
+A12 devices and newer: 14.0-14.6
 
 ---
 
