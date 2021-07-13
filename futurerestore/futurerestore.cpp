@@ -118,8 +118,9 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS) :
 }
 
 bool futurerestore::init(){
-    if (_didInit) return _didInit;
-    _didInit = (check_mode(_client) != MODE_UNKNOWN);
+    if (_didInit) return true;
+//    If device is in an invalid state, return early
+    if (!(_didInit = check_mode(_client) != MODE_UNKNOWN)) return false;
     if (!(_client->image4supported = is_image4_supported(_client))){
         info("[INFO] 32-bit device detected\n");
     }else{
