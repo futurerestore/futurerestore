@@ -924,6 +924,7 @@ void futurerestore::doRestore(const char *ipsw){
     plist_t build_identity = NULL;
 
     client->ipsw = strdup(ipsw);
+    if (_noRestore) client->flags |= FLAG_NO_RESTORE;
     if (!_isUpdateInstall) client->flags |= FLAG_ERASE;
     
     irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, client);
