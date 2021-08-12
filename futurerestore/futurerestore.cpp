@@ -1340,8 +1340,9 @@ void futurerestore::doRestore(const char *ipsw){
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
-    int result = 0;
-    retassure(!(result = restore_device(client, build_identity, filesystem)), "ERROR: Unable to restore device\n");
+    int result = restore_device(client, build_identity, filesystem);
+    if (result == 2) return;
+    else retassure(!(result), "ERROR: Unable to restore device\n");
 }
 
 int futurerestore::doJustBoot(const char *ipsw, string bootargs){
