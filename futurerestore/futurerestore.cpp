@@ -106,7 +106,7 @@ extern "C"{
 };
 
 #pragma mark futurerestore
-futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS) : _isUpdateInstall(isUpdateInstall), _isPwnDfu(isPwnDfu), _noIBSS(noIBSS){
+futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, bool noRestore) : _isUpdateInstall(isUpdateInstall), _isPwnDfu(isPwnDfu), _noIBSS(noIBSS), _noRestore(noRestore){
     _client = idevicerestore_client_new();
     if (_client == NULL) throw std::string("could not create idevicerestore client\n");
     
