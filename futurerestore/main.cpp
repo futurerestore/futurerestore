@@ -74,7 +74,7 @@ void cmd_help(){
     printf("  -w, --wait\t\t\tKeep rebooting until ApNonce matches APTicket (ApNonce collision, unreliable)\n");
     printf("  -d, --debug\t\t\tShow all code, use to save a log for debug testing\n");
     printf("  -e, --exit-recovery\t\tExit recovery mode and quit\n");
-    printf("  -z, --no-restore\t\tDo not restore and end after booting to the ramdisk\n");
+    printf("  -z, --no-restore\t\tDo not restore and end right before NOR data is sent\n");
     
 #ifdef HAVE_LIBIPATCHER
     printf("\nOptions for downgrading with Odysseus:\n");
