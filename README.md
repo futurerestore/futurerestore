@@ -7,7 +7,7 @@ Latest **stable** compiled version can be found [here](https://github.com/m1stad
 
 For A12-A14, and WiFi-only iPad restores - use the latest beta build for your platform [here](https://nightly.link/m1stadev/futurerestore/workflows/ci/test).
 
-**There are currently no pre-compiled beta builds for Windows.**
+**There currently are no pre-compiled beta builds for Windows.**
 
 __Only use if you are sure what you're doing.__
 
