@@ -1412,7 +1412,7 @@ void futurerestore::doRestore(const char *ipsw){
             if(!_isUpdateInstall) {
                 bootargs.append("nand-enable-reformat=0x1 ");
             }
-            bootargs.append("-v -restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+            bootargs.append("-restore -progress");
         }
         enterPwnRecovery(build_identity, bootargs);
         irecv_device_event_unsubscribe(_client->irecv_e_ctx);
