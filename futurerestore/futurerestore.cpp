@@ -1245,7 +1245,7 @@ void futurerestore::doRestore(const char *ipsw){
     mutex_lock(&client->device_event_mutex);
     debug("Waiting for device to enter restore mode...\n");
     cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
-    retassure((client->mode == MODE_RESTORE || (mutex_unlock(&client->device_event_mutex),0)), "Device can't enter to restore mode");
+    retassure((client->mode == MODE_RESTORE || (mutex_unlock(&client->device_event_mutex),0)), "Device failed to enter restore mode");
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
