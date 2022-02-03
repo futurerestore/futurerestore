@@ -1198,9 +1198,8 @@ void futurerestore::doRestore(const char *ipsw){
 
         /* now we load the iBEC */
         retassure(!recovery_send_ibec(client, build_identity),"ERROR: Unable to send iBEC\n");
-
         
-        ("waiting for device to reconnect... ");
+        printf("waiting for device to reconnect... ");
         recovery_client_free(client);
         
         debug("Waiting for device to disconnect...\n");
