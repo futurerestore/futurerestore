@@ -898,7 +898,7 @@ void futurerestore::doRestore(const char *ipsw){
             reterror("APTicket can't be used for restoring this device\n");
         }
     }else
-        printf("Verified ECID in APTicket matches the device ECID\n");
+        printf("Verified ECID in APTicket matches the device's ECID\n");
 
     if (_client->image4supported) {
         printf("checking if the APTicket is valid for this restore...\n");
