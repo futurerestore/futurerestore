@@ -905,7 +905,7 @@ void futurerestore::doRestore(const char *ipsw){
         uint64_t deviceEcid = getDeviceEcid();
 
         if (im4mEcid != deviceEcid) {
-            error("ECID inside APTicket doesn't match device ECID\n");
+            error("ECID inside APTicket doesn't match the device's ECID\n");
             printf("APTicket is valid for %16llu (dec) but device is %16llu (dec)\n",im4mEcid,deviceEcid);
             if(_skipBlob) {
                 info("[WARNING] NOT VALIDATING SHSH BLOBS ECID!\n");
