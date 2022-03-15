@@ -6,11 +6,7 @@
 //  Copyright © 2016 tihmstar. All rights reserved.
 //
 
-#include <iostream>
 #include <getopt.h>
-#include <string.h>
-#include <unistd.h>
-#include <vector>
 #include "futurerestore.hpp"
 
 extern "C"{
@@ -34,31 +30,32 @@ extern "C"{
 #endif
 
 static struct option longopts[] = {
-        { "apticket",           required_argument,      NULL, 't' },
-        { "baseband",           required_argument,      NULL, 'b' },
-        { "baseband-manifest",  required_argument,      NULL, 'p' },
-        { "sep",                required_argument,      NULL, 's' },
-        { "sep-manifest",       required_argument,      NULL, 'm' },
-        { "wait",               no_argument,            NULL, 'w' },
-        { "update",             no_argument,            NULL, 'u' },
-        { "debug",              no_argument,            NULL, 'd' },
-        { "exit-recovery",      no_argument,            NULL, 'e' },
-        { "latest-sep",         no_argument,            NULL, '0' },
-        { "no-restore",         no_argument,            NULL, 'z' },
-        { "latest-baseband",    no_argument,            NULL, '1' },
-        { "no-baseband",        no_argument,            NULL, '2' },
+        { "apticket",           required_argument,      nullptr, 't' },
+        { "baseband",           required_argument,      nullptr, 'b' },
+        { "baseband-manifest",  required_argument,      nullptr, 'p' },
+        { "sep",                required_argument,      nullptr, 's' },
+        { "sep-manifest",       required_argument,      nullptr, 'm' },
+        { "wait",               no_argument,            nullptr, 'w' },
+        { "update",             no_argument,            nullptr, 'u' },
+        { "debug",              no_argument,            nullptr, 'd' },
+        { "exit-recovery",      no_argument,            nullptr, 'e' },
+        { "custom-latest",      required_argument,      nullptr, 'c' },
+        { "latest-sep",         no_argument,            nullptr, '0' },
+        { "no-restore",         no_argument,            nullptr, 'z' },
+        { "latest-baseband",    no_argument,            nullptr, '1' },
+        { "no-baseband",        no_argument,            nullptr, '2' },
 #ifdef HAVE_LIBIPATCHER
-        { "use-pwndfu",         no_argument,            NULL, '3' },
-        { "no-ibss",            no_argument,            NULL, '4' },
-        { "rdsk",               required_argument,      NULL, '5' },
-        { "rkrn",               required_argument,      NULL, '6' },
-        { "set-nonce",          optional_argument,      NULL, '7' },
-        { "serial",             no_argument,            NULL, '8' },
-        { "boot-args",          required_argument,      NULL, '9' },
-        { "no-cache",           no_argument,            NULL, 'a' },
-        { "skip-blob",          no_argument,            NULL, 'c' },
+        { "use-pwndfu",         no_argument,            nullptr, '3' },
+        { "no-ibss",            no_argument,            nullptr, '4' },
+        { "rdsk",               required_argument,      nullptr, '5' },
+        { "rkrn",               required_argument,      nullptr, '6' },
+        { "set-nonce",          optional_argument,      nullptr, '7' },
+        { "serial",             no_argument,            nullptr, '8' },
+        { "boot-args",          required_argument,      nullptr, '9' },
+        { "no-cache",           no_argument,            nullptr, 'a' },
+        { "skip-blob",          no_argument,            nullptr, 'f' },
 #endif
-        { NULL, 0, NULL, 0 }
+        { nullptr, 0, nullptr, 0 }
 };
 
 #define FLAG_WAIT               1 << 0
@@ -87,6 +84,7 @@ void cmd_help(){
     printf("  -d, --debug\t\t\tShow all code, use to save a log for debug testing\n");
     printf("  -e, --exit-recovery\t\tExit recovery mode and quit\n");
     printf("  -z, --no-restore\t\tDo not restore and end right before NOR data is sent\n");
+    printf("  -c, --custom-latest VERSION\tSpecify custom latest version to use for SEP, Baseband and other FirmwareUpdater components\n");
 
 #ifdef HAVE_LIBIPATCHER
     printf("\nOptions for downgrading with Odysseus:\n");
@@ -136,35 +134,32 @@ int main_r(int argc, const char * argv[]) {
 #endif
 
     int optindex = 0;
-    int opt = 0;
+    int opt;
     long flags = 0;
     bool exitRecovery = false;
-    bool noRestore = false;
 
-    int isSepManifestSigned = 0;
-    int isBasebandSigned = 0;
-
-    const char *ipsw = NULL;
-    const char *basebandPath = NULL;
-    const char *basebandManifestPath = NULL;
-    const char *sepPath = NULL;
-    const char *sepManifestPath = NULL;
-    const char *bootargs = NULL;
-    const char *ramdiskPath = NULL;
-    const char *kernelPath = NULL;
-    const char *custom_nonce = NULL;
+    const char *ipsw = nullptr;
+    const char *basebandPath = nullptr;
+    const char *basebandManifestPath = nullptr;
+    const char *sepPath = nullptr;
+    const char *sepManifestPath = nullptr;
+    const char *bootargs = nullptr;
+    std::string customLatest;
+    const char *ramdiskPath = nullptr;
+    const char *kernelPath = nullptr;
+    const char *custom_nonce = nullptr;
 
     vector<const char*> apticketPaths;
 
-    t_devicevals devVals = {0};
-    t_iosVersion versVals = {0};
+    t_devicevals devVals = {nullptr};
+    t_iosVersion versVals = {nullptr};
 
     if (argc == 1){
         cmd_help();
         return -1;
     }
 
-    while ((opt = getopt_long(argc, (char* const *)argv, "ht:b:p:s:m:wudez0123456789ac", longopts, &optindex)) > 0) {
+    while ((opt = getopt_long(argc, (char* const *)argv, "ht:b:p:s:m:c:wude0z123456789af", longopts, &optindex)) > 0) {
         switch (opt) {
             case 't': // long option: "apticket"; can be called as short option
                 apticketPaths.push_back(optarg);
@@ -186,6 +181,9 @@ int main_r(int argc, const char * argv[]) {
                 break;
             case 'u': // long option: "update"; can be called as short option
                 flags |= FLAG_UPDATE;
+                break;
+            case 'c': // long option: "custom-latest";
+                customLatest = (optarg) ? std::string(optarg) : std::string("");
                 break;
             case '0': // long option: "latest-sep";
                 flags |= FLAG_LATEST_SEP;
@@ -213,11 +211,11 @@ int main_r(int argc, const char * argv[]) {
                 break;
             case '7': // long option: "set-nonce";
                 flags |= FLAG_SET_NONCE;
-                custom_nonce = (optarg) ? optarg : NULL;
-                if(custom_nonce != NULL) {
+                custom_nonce = (optarg) ? optarg : nullptr;
+                if(custom_nonce != nullptr) {
                     uint64_t gen;
                     retassure(strlen(custom_nonce) == 16 || strlen(custom_nonce) == 18,"Incorrect nonce length!\n");
-                    sscanf(custom_nonce, "0x%16llx",&gen);
+                    gen = std::stoul(custom_nonce, nullptr, 16);
                     retassure(gen, "failed to parse generator. Make sure it is in format 0x%16llx");
                 }
                 break;
@@ -226,12 +224,12 @@ int main_r(int argc, const char * argv[]) {
                 break;
             case '9': // long option: "boot-args";
                 flags |= FLAG_BOOT_ARGS;
-                bootargs = (optarg) ? optarg : NULL;
+                bootargs = (optarg) ? optarg : nullptr;
                 break;
             case 'a': // long option: "no-cache";
                 flags |= FLAG_NO_CACHE;
                 break;
-            case 'c': // long option: "skip-blob";
+            case 'f': // long option: "skip-blob";
                 flags |= FLAG_SKIP_BLOB;
                 break;
 #endif
@@ -251,7 +249,6 @@ int main_r(int argc, const char * argv[]) {
     }
 
     if (argc-optind == 1) {
-        argc -= optind;
         argv += optind;
 
         ipsw = argv[0];
@@ -303,10 +300,16 @@ int main_r(int argc, const char * argv[]) {
     }
 
     try {
-        if (apticketPaths.size()) client.loadAPTickets(apticketPaths);
+        if (!apticketPaths.empty()) {
+            client.loadAPTickets(apticketPaths);
+        }
+
+        if(!customLatest.empty()) {
+            client.setCustomLatest(customLatest);
+        }
 
         if (!(
-                ((apticketPaths.size() && ipsw)
+                ((!apticketPaths.empty() && ipsw)
                  && ((basebandPath && basebandManifestPath) || ((flags & FLAG_LATEST_BASEBAND) || (flags & FLAG_NO_BASEBAND)))
                  && ((sepPath && sepManifestPath) || (flags & FLAG_LATEST_SEP) || client.is32bit())
                 ) || (ipsw && (flags & FLAG_IS_PWN_DFU))
@@ -355,14 +358,16 @@ int main_r(int argc, const char * argv[]) {
 
         if (flags & FLAG_LATEST_SEP){
             info("user specified to use latest signed SEP\n");
-            client.loadLatestSep();
+            client.downloadLatestSep();
         }else if (!client.is32bit()){
-            client.loadSep(sepPath);
+            client.setSepPath(sepPath);
             client.setSepManifestPath(sepManifestPath);
+            client.loadSep(sepPath);
+            client.loadSepManifest(sepManifestPath);
         }
 
         versVals.basebandMode = kBasebandModeWithoutBaseband;
-        if (!client.is32bit() && !(isSepManifestSigned = isManifestSignedForDevice(client.sepManifestPath(), &devVals, &versVals, NULL))){
+        if (!client.is32bit() && !(isManifestSignedForDevice(client.getSepManifestPath().c_str(), &devVals, &versVals, nullptr))){
             reterror("SEP firmware is NOT being signed!\n");
         }
         if (flags & FLAG_NO_BASEBAND){
@@ -379,10 +384,12 @@ int main_r(int argc, const char * argv[]) {
         }else{
             if (flags & FLAG_LATEST_BASEBAND){
                 info("user specified to use latest signed baseband\n");
-                client.loadLatestBaseband();
+                client.downloadLatestBaseband();
             }else{
                 client.setBasebandPath(basebandPath);
                 client.setBasebandManifestPath(basebandManifestPath);
+                client.loadBaseband(basebandPath);
+                client.loadBasebandManifest(basebandManifestPath);
                 printf("Did set SEP+baseband path and firmware\n");
             }
 
@@ -390,7 +397,7 @@ int main_r(int argc, const char * argv[]) {
             if (!(devVals.bbgcid = client.getBasebandGoldCertIDFromDevice())){
                 printf("[WARNING] using tsschecker's fallback to get BasebandGoldCertID. This might result in invalid baseband signing status information\n");
             }
-            if (!(isBasebandSigned = isManifestSignedForDevice(client.basebandManifestPath(), &devVals, &versVals, NULL))) {
+            if (!(isManifestSignedForDevice(client.getBasebandManifestPath().c_str(), &devVals, &versVals, nullptr))) {
                 reterror("baseband firmware is NOT being signed!\n");
             }
         }
