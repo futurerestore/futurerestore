@@ -69,7 +69,6 @@ std::string futurerestoreTempPath(download");
 std::string tempPath("/tmp");
 std::string futurerestoreTempPath(tempPath + "/futurerestore");
 #endif
-
 std::string roseTempPath = futurerestoreTempPath + "/rose.bin";
 std::string seTempPath = futurerestoreTempPath + "/se.sefw";
 std::string veridianDGMTempPath = futurerestoreTempPath + "/veridianDGM.der";
@@ -78,46 +77,35 @@ std::string basebandTempPath = futurerestoreTempPath + "/baseband.bbfw";
 std::string basebandManifestTempPath = futurerestoreTempPath + "/basebandManifest.plist";
 std::string sepTempPath = futurerestoreTempPath + "/sep.im4p";
 std::string sepManifestTempPath = futurerestoreTempPath + "/sepManifest.plist";
-
 #ifdef __APPLE__
-
 #   include <CommonCrypto/CommonDigest.h>
-
 #   define SHA1(d, n, md) CC_SHA1(d, n, md)
 #   define SHA384(d, n, md) CC_SHA384(d, n, md)
 #else
 #   include <openssl/sha.h>
 #endif // __APPLE__
-
 #ifndef HAVE_LIBIPATCHER
 #define _enterPwnRecoveryRequested false
 #endif
-
 using namespace tihmstar;
-
 #pragma mark helpers
 extern "C" {
 void irecv_event_cb(const irecv_device_event_t *event, void *userdata);
 void idevice_event_cb(const idevice_event_t *event, void *userdata);
 }
-
 #pragma mark futurerestore
-
 futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, bool setNonce, bool serial,
                              bool noRestore) : _isUpdateInstall(isUpdateInstall), _isPwnDfu(isPwnDfu), _noIBSS(noIBSS),
                                                _setNonce(setNonce), _serial(serial), _noRestore(noRestore) {
     _client = idevicerestore_client_new();
     retassure(_client != nullptr, "could not create idevicerestore client\n");
-
     struct stat st{0};
     if (stat(futurerestoreTempPath.c_str(), &st) == -1) safe_mkdir(futurerestoreTempPath.c_str(), 0755);
-
     nocache = 1; //tsschecker nocache
     _foundnonce = -1;
     _useCustomLatest = false;
     _customLatest = std::string("");
 }
-
 bool futurerestore::init() {
     if (_didInit) return _didInit;
 //    If device is in an invalid state, don't check if it supports img4
@@ -130,14 +118,12 @@ bool futurerestore::init() {
     }
     return _didInit;
 }
-
 uint64_t futurerestore::getDeviceEcid() {
     retassure(_didInit, "did not init\n");
     uint64_t ecid;
     get_ecid(_client, &ecid);
     return ecid;
 }
-
 int futurerestore::getDeviceMode(bool reRequest) {
     retassure(_didInit, "did not init\n");
     if (!reRequest && _client->mode && _client->mode->index != _MODE_UNKNOWN) {
@@ -148,14 +134,11 @@ int futurerestore::getDeviceMode(bool reRequest) {
         return check_mode(_client);
     }
 }
-
 void futurerestore::putDeviceIntoRecovery() {
     retassure(_didInit, "did not init\n");
-
 #ifdef HAVE_LIBIPATCHER
     _enterPwnRecoveryRequested = _isPwnDfu;
 #endif
-
     getDeviceMode(false);
     info("Found device in %s mode\n", _client->mode->string);
     if (_client->mode == MODE_NORMAL) {
@@ -184,45 +167,37 @@ void futurerestore::putDeviceIntoRecovery() {
         reterror("unsupported device mode, please put device in recovery or normal mode\n");
     }
     safeFree(_client->udid); //only needs to be freed manually when function didn't throw exception
-
     //these get also freed by destructor
     dfu_client_free(_client);
     recovery_client_free(_client);
 }
-
 void futurerestore::setAutoboot(bool val) {
     retassure(_didInit, "did not init\n");
-
     retassure(getDeviceMode(false) == _MODE_RECOVERY, "can't set auto-boot, when device isn't in recovery mode\n");
     if (!_client->recovery) {
         retassure(!recovery_client_new(_client), "Could not connect to device in recovery mode.\n");
     }
     retassure(!recovery_set_autoboot(_client, val), "Setting auto-boot failed?!\n");
 }
-
 void futurerestore::exitRecovery() {
     setAutoboot(true);
     recovery_send_reset(_client);
     recovery_client_free(_client);
 }
-
 plist_t futurerestore::nonceMatchesApTickets() {
     retassure(_didInit, "did not init\n");
-
     if (getDeviceMode(true) != _MODE_RECOVERY) {
         if (getDeviceMode(false) != _MODE_DFU || *_client->version != '9')
             reterror("Device is not in recovery mode, can't check ApNonce\n");
         else
             _rerestoreiOS9 = (info("Detected iOS 9.x 32-bit re-restore, proceeding in DFU mode\n"), true);
     }
-
     unsigned char *realnonce;
     int realNonceSize = 0;
     if (_rerestoreiOS9) {
         info("Skipping ApNonce check\n");
     } else {
         recovery_get_ap_nonce(_client, &realnonce, &realNonceSize);
-
         info("Got ApNonce from device: ");
         int i = 0;
         for (i = 0; i < realNonceSize; i++) {
@@ -230,9 +205,7 @@ plist_t futurerestore::nonceMatchesApTickets() {
         }
         info("\n");
     }
-
     vector<const char *> nonces;
-
     if (_client->image4supported) {
         for (int i = 0; i < _im4ms.size(); i++) {
             auto nonce = img4tool::getValFromIM4M({_im4ms[i].first, _im4ms[i].second}, 'BNCH');
@@ -1318,7 +1291,7 @@ void futurerestore::doRestore(const char *ipsw) {
     debug("Waiting for device to enter restore mode...\n");
     cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
     retassure((client->mode == MODE_RESTORE || (mutex_unlock(&client->device_event_mutex), 0)),
-              "Device can't enter to restore mode");
+              "Device failed to enter restore mode");
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");

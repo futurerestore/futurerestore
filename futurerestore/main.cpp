@@ -371,7 +371,7 @@ int main_r(int argc, const char * argv[]) {
             reterror("SEP firmware is NOT being signed!\n");
         }
         if (flags & FLAG_NO_BASEBAND){
-            printf("\nWARNING: user specified is not to flash a baseband. This can make the restore fail if the device needs a baseband!\n");
+            printf("\nWARNING: user specified not to flash a baseband. This can make the restore fail if the device needs a baseband!\n");
             printf("if you added this flag by mistake, you can press CTRL-C now to cancel\n");
             int c = 10;
             printf("continuing restore in ");
