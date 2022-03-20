@@ -920,7 +920,7 @@ void futurerestore::doRestore(const char *ipsw) {
 
     plist_t manifest = plist_dict_get_item(build_identity, "Manifest"); //this is the buildidentity used for restore
 
-    printf("checking APTicket to be valid for this restore...\n"); //if we are in pwnDFU, just use first APTicket. We don't need to check nonces.
+    printf("checking if the APTicket is valid for this restore...\n"); //if we are in pwnDFU, just use first APTicket. We don't need to check nonces.
     auto im4m = (_enterPwnRecoveryRequested || _rerestoreiOS9) ? _im4ms.at(0) : nonceMatchesIM4Ms();
 
     uint64_t deviceEcid = getDeviceEcid();
@@ -946,7 +946,7 @@ void futurerestore::doRestore(const char *ipsw) {
         printf("Verified ECID in APTicket matches device ECID\n");
 
     if (_client->image4supported) {
-        printf("checking APTicket to be valid for this restore...\n");
+        printf("checking if the APTicket is valid for this restore...\n");
 
         if (im4mEcid != deviceEcid) {
             error("ECID inside APTicket does not match device ECID\n");
@@ -1318,7 +1318,7 @@ void futurerestore::doRestore(const char *ipsw) {
     debug("Waiting for device to enter restore mode...\n");
     cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
     retassure((client->mode == MODE_RESTORE || (mutex_unlock(&client->device_event_mutex), 0)),
-              "Device can't enter to restore mode");
+              "Unable to place device into restore mode");
     mutex_unlock(&client->device_event_mutex);
 
     info("About to restore device... \n");
