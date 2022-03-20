@@ -935,7 +935,7 @@ void futurerestore::doRestore(const char *ipsw) {
     retassure(im4mEcid, "Failed to read ECID from APTicket\n");
 
     if (im4mEcid != deviceEcid) {
-        error("ECID inside APTicket does not match device ECID\n");
+        error("ECID inside of the APTicket does not match the device's ECID\n");
         printf("APTicket is valid for %16llu (dec) but device is %16llu (dec)\n", im4mEcid, deviceEcid);
         if (_skipBlob) {
             info("[WARNING] NOT VALIDATING SHSH BLOBS ECID!\n");
@@ -943,13 +943,13 @@ void futurerestore::doRestore(const char *ipsw) {
             reterror("APTicket can't be used for restoring this device\n");
         }
     } else
-        printf("Verified ECID in APTicket matches device ECID\n");
+        printf("Verified ECID in APTicket matches the device's ECID\n");
 
     if (_client->image4supported) {
         printf("checking if the APTicket is valid for this restore...\n");
 
         if (im4mEcid != deviceEcid) {
-            error("ECID inside APTicket does not match device ECID\n");
+            error("ECID inside of the APTicket does not match the device's ECID\n");
             printf("APTicket is valid for %16llu (dec) but device is %16llu (dec)\n", im4mEcid, deviceEcid);
             if (_skipBlob) {
                 info("[WARNING] NOT VALIDATING SHSH BLOBS ECID!\n");
@@ -957,7 +957,7 @@ void futurerestore::doRestore(const char *ipsw) {
                 reterror("APTicket can't be used for restoring this device\n");
             }
         } else
-            printf("Verified ECID in APTicket matches device ECID\n");
+            printf("Verified ECID in APTicket matches the device's ECID\n");
 
         plist_t ticketIdentity = nullptr;
 
@@ -1049,7 +1049,7 @@ void futurerestore::doRestore(const char *ipsw) {
 
         retassure(_client->basebandBuildIdentity, "BasebandBuildIdentity not loaded, refusing to continue");
     } else {
-        warning("WARNING: we don't have a basebandbuildmanifest, does not flashing baseband!\n");
+        warning("WARNING: we don't have a BasebandBuildManifest, won't flash baseband!\n");
     }
 
     if (_client->image4supported) {
