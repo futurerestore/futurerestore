@@ -659,12 +659,13 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
 #endif
             info("Booting iBEC, waiting for device to reconnect...\n");
             cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);
-            #if arm64
+#if arm64
             retassure(((_client->mode == MODE_RECOVERY) || (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not reconnect. Switch to USB-A to lightning cable (see issue #67)");
-            #else
+#else
             retassure(((_client->mode == MODE_RECOVERY) || (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not reconnect. Possibly invalid iBEC. Reset device and try again");
+#endif
             mutex_unlock(&_client->device_event_mutex);
             getDeviceMode(true);
             retassure(((recovery_client_new(_client) == IRECV_E_SUCCESS) ||
@@ -675,12 +676,13 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
                (_client->device->chip_id >= 0x8101 && _client->device->chip_id <= 0x8301)) {
         dfu = true;
         cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);
-        #if arm64
+#if arm64
         retassure(((_client->mode == MODE_RECOVERY) || (mutex_unlock(&_client->device_event_mutex), 0)),
                   "Device did not reconnect. Switch to USB-A to lightning cable (see issue #67)");
-        #else
+#else
         retassure(((_client->mode == MODE_RECOVERY) || (mutex_unlock(&_client->device_event_mutex), 0)),
                   "Device did not reconnect. Possibly invalid iBSS. Reset device and try again");
+#endif
     } else {
         mutex_unlock(&_client->device_event_mutex);
         reterror("Device not supported!\n");
