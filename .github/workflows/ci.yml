@@ -12,18 +12,36 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-      with:
-        submodules: 'true'
-        fetch-depth: 0
-    - name: Setup MSYS
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        release: false
-        update: false
-    - name: Windows Build
-      run: |
-        /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
-        /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+      - name: Setup MSYS
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          release: false
+          update: false
+          install: >-
+            git
+            mingw-w64-clang-x86_64-clang
+            make
+            autoconf
+            automake-wrapper
+            libtool
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-libpng
+            mingw-w64-clang-x86_64-libzip
+            libbz2-devel
+            liblzma-devel
+            mingw-w64-clang-x86_64-xz
+            pkgconf
+            libreadline-devel
+            mingw-w64-clang-x86_64-readline
+            mingw-w64-clang-x86_64-ncurses
+            mingw-w64-clang-x86_64-libusb
+      - name: Windows Build
+        run: |
+          /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
+          /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
