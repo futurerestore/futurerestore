@@ -17,35 +17,14 @@ jobs:
       with:
         submodules: 'true'
         fetch-depth: 0
-    - name: MSYS Install
+    - name: Setup MSYS
       uses: msys2/setup-msys2@v2
       with:
-          msystem: MINGW64
-          release: false
-          update: false
-          install: >-
-            git
-            mingw-w64-clang-x86_64-clang
-            make
-            autoconf
-            automake-wrapper
-            libtool
-            mingw-w64-clang-x86_64-cmake
-            mingw-w64-clang-x86_64-libpng
-            mingw-w64-clang-x86_64-libzip
-            libbz2-devel
-            liblzma-devel
-            mingw-w64-clang-x86_64-xz
-            pkgconf
-            libreadline-devel
-            mingw-w64-clang-x86_64-readline
-            mingw-w64-clang-x86_64-ncurses
-            mingw-w64-clang-x86_64-libusb
+        msystem: MINGW64
+        release: false
+        update: false
     - name: Windows Build
-      uses: msys2/setup-msys2@v2
-      with:
-          msystem: MINGW64
-          release: false
-          update: false
-          run: >-
-            pwd
+      run: |
+        uname -a
+        pwd
+        ls -lath
