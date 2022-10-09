@@ -30,6 +30,8 @@ jobs:
             autoconf
             automake-wrapper
             libtool
+            cmake
+            clang
             mingw-w64-clang-x86_64-cmake
             mingw-w64-clang-x86_64-libpng
             mingw-w64-clang-x86_64-libzip
