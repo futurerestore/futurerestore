@@ -17,7 +17,7 @@ jobs:
       with:
         submodules: 'true'
         fetch-depth: 0
-    - name: Windows Build
+    - name: MSYS Install
       uses: msys2/setup-msys2@v2
       with:
           msystem: MINGW64
@@ -41,5 +41,11 @@ jobs:
             mingw-w64-clang-x86_64-readline
             mingw-w64-clang-x86_64-ncurses
             mingw-w64-clang-x86_64-libusb
-          run: |
+    - name: Windows Build
+      uses: msys2/setup-msys2@v2
+      with:
+          msystem: MINGW64
+          release: false
+          update: false
+          run: >-
             pwd
