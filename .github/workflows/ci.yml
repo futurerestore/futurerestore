@@ -25,6 +25,5 @@ jobs:
         update: false
     - name: Windows Build
       run: |
-        uname -a
-        pwd
-        ls -lath
+        /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
+        /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
