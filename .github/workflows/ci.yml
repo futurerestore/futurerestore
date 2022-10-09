@@ -35,6 +35,7 @@ jobs:
             mingw-w64-clang-x86_64-cmake
             mingw-w64-clang-x86_64-libpng
             mingw-w64-clang-x86_64-libzip
+            mingw-w64-zlib
             libbz2-devel
             liblzma-devel
             mingw-w64-clang-x86_64-xz
