@@ -48,5 +48,5 @@ jobs:
       - name: Windows Build
         run: |
           find / -type f -name "zlib.h"
-#          /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
-#          /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
+          /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
+          /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
