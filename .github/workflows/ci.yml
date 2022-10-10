@@ -47,5 +47,6 @@ jobs:
             mingw-w64-clang-x86_64-libusb
       - name: Windows Build
         run: |
-          /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
-          /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
+          find / -type f -name "zlib.h"
+#          /d/a/futurerestore/futurerestore/.github/workflows/win-bootstrap.sh
+#          /d/a/futurerestore/futurerestore/.github/workflows/win-build.sh
