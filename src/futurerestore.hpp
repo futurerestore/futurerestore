@@ -65,13 +65,16 @@ class futurerestore {
 
     char *_firmwareJson = nullptr;
     char *_betaFirmwareJson = nullptr;
+    char *_otaFirmwareJson = nullptr;
     jssytok_t *_firmwareTokens = nullptr;;
     jssytok_t *_betaFirmwareTokens = nullptr;
+    jssytok_t *_otaFirmwareTokens = nullptr;
     char *_latestManifest = nullptr;
     char *_latestFirmwareUrl = nullptr;
     bool _useCustomLatest = false;
     bool _useCustomLatestBuildID = false;
     bool _useCustomLatestBeta = false;
+    bool _useCustomLatestOTA = false;
     std::string _customLatest;
     std::string _customLatestBuildID;
     const char *_model = nullptr;
@@ -159,7 +162,7 @@ public:
     unsigned char *getSHA(const std::string& filePath, int type = 0);
 
     void setCustomLatest(std::string version){_customLatest = version; _useCustomLatest = true;}
-    void setCustomLatestBuildID(std::string version, bool beta){_customLatestBuildID = version; _useCustomLatest = false; _useCustomLatestBuildID = true; _useCustomLatestBeta = beta;}
+    void setCustomLatestBuildID(std::string version, bool beta, bool ota){_customLatestBuildID = version; _useCustomLatest = false; _useCustomLatestBuildID = true; _useCustomLatestBeta = beta; _useCustomLatestOTA = ota;}
     void setSepPath(std::string sepPath) {_sepPath = sepPath;}
     void setSepManifestPath(std::string sepManifestPath) {_sepManifestPath = sepManifestPath;}
     void setRamdiskPath(std::string ramdiskPath) {_ramdiskPath = ramdiskPath;}

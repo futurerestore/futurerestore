@@ -40,6 +40,7 @@ static struct option longopts[] = {
         { "custom-latest-buildid",      required_argument,      nullptr, 'g' },
         { "help",                       no_argument,            nullptr, 'h' },
         { "custom-latest-beta",         no_argument,            nullptr, 'i' },
+        { "custom-latest-ota",          no_argument,            nullptr, 'k' },
         { "latest-sep",                 no_argument,            nullptr, '0' },
         { "no-restore",                 no_argument,            nullptr, 'z' },
         { "latest-baseband",            no_argument,            nullptr, '1' },
@@ -77,7 +78,8 @@ static struct option longopts[] = {
 #define FLAG_CUSTOM_LATEST          1 << 15
 #define FLAG_CUSTOM_LATEST_BUILDID  1 << 16
 #define FLAG_CUSTOM_LATEST_BETA     1 << 17
-#define FLAG_NO_RSEP_FR             1 << 18
+#define FLAG_CUSTOM_LATEST_OTA      1 << 18
+#define FLAG_NO_RSEP_FR             1 << 19
 
 bool manual = false;
 
@@ -95,7 +97,8 @@ void cmd_help(){
     printf("  -z, --no-restore\t\t\tDo not restore and end right before NOR data is sent\n");
     printf("  -c, --custom-latest VERSION\t\tSpecify custom latest version to use for SEP, Baseband and other FirmwareUpdater components\n");
     printf("  -g, --custom-latest-buildid BUILDID\tSpecify custom latest buildid to use for SEP, Baseband and other FirmwareUpdater components\n");
-    printf("  -i, --custom-latest-beta\t\tGet custom url from list of beta firmwares");
+    printf("  -i, --custom-latest-beta\t\tGet custom url from list of beta firmwares\n");
+    printf("  -k, --custom-latest-ota\t\tGet custom url from list of ota firmwares");
 
 #ifdef HAVE_LIBIPATCHER
     printf("\nOptions for downgrading with Odysseus:\n");
@@ -182,7 +185,7 @@ int main_r(int argc, const char * argv[]) {
         return -1;
     }
 
-    while ((opt = getopt_long(argc, (char* const *)argv, "ht:b:p:s:m:c:g:hiwude0z123456789afj", longopts, &optindex)) > 0) {
+    while ((opt = getopt_long(argc, (char* const *)argv, "ht:b:p:s:m:c:g:hikwude0z123456789afj", longopts, &optindex)) > 0) {
         switch (opt) {
             case 'h': // long option: "help"; can be called as short option
                 cmd_help();
@@ -223,6 +226,9 @@ int main_r(int argc, const char * argv[]) {
                 break;
             case 'i': // long option: "custom-latest-beta"; can be called as short option
                 flags |= FLAG_CUSTOM_LATEST_BETA;
+                break;
+            case 'k': // long option: "custom-latest-ota"; can be called as short option
+                flags |= FLAG_CUSTOM_LATEST_OTA;
                 break;
             case '0': // long option: "latest-sep";
                 flags |= FLAG_LATEST_SEP;
@@ -336,6 +342,8 @@ int main_r(int argc, const char * argv[]) {
         retassure((flags & FLAG_IS_PWN_DFU),"--skip-blob requires --use-pwndfu\n");
     if(flags & FLAG_CUSTOM_LATEST_BETA)
         retassure((flags & FLAG_CUSTOM_LATEST_BUILDID),"-i, --custom-latest-beta requires -g, --custom-latest-buildid\n");
+    if(flags & FLAG_CUSTOM_LATEST_OTA)
+        retassure((flags & FLAG_CUSTOM_LATEST_BUILDID),"-k, --custom-latest-ota requires -g, --custom-latest-buildid\n");
     if(flags & FLAG_CUSTOM_LATEST_BUILDID)
         retassure((flags & FLAG_CUSTOM_LATEST) == 0,"-g, --custom-latest-buildid is not compatible with -c, --custom-latest\n");
 
@@ -354,7 +362,7 @@ int main_r(int argc, const char * argv[]) {
             client.setCustomLatest(customLatest);
         }
         if(!customLatestBuildID.empty()) {
-            client.setCustomLatestBuildID(customLatestBuildID, (flags & FLAG_CUSTOM_LATEST_BETA) != 0);
+            client.setCustomLatestBuildID(customLatestBuildID, (flags & FLAG_CUSTOM_LATEST_BETA) != 0, (flags & FLAG_CUSTOM_LATEST_OTA) != 0);
         }
 
         if (!(

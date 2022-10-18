@@ -44,6 +44,7 @@ Usage: `futurerestore [OPTIONS] iPSW`
 | ` -c `         | ` --custom-latest VERSION `         | Specify custom latest version to use for SEP, Baseband and other FirmwareUpdater components                                                             |
 | ` -g `         | ` --custom-latest-buildid BUILDID ` | Specify custom latest buildid to use for SEP, Baseband and other FirmwareUpdater components                                                             |
 | ` -i `         | ` --custom-latest-beta `            | Get custom url from list of beta firmwares                                                                                                              |
+| ` -k `         | ` --custom-latest-ota `             | Get custom url from list of OTA firmwares                                                                                                               |
 | ` -3 `         | ` --use-pwndfu `                    | Restoring devices with Odysseus method. Device needs to be in pwned DFU mode already                                                                    |
 | ` -4 `         | ` --no-ibss `                       | Restoring devices with Odysseus method. For checkm8/iPwnder32 specifically, bootrom needs to be patched already with unless iPwnder.                    |
 | ` -5 `         | ` --rdsk PATH `                     | Set custom restore ramdisk for entering restoremode(requires use-pwndfu)                                                                                |

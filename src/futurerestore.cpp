@@ -1550,8 +1550,10 @@ futurerestore::~futurerestore() {
     safeFree(_ibootBuild);
     safeFree(_firmwareJson);
     safeFree(_betaFirmwareJson);
+    safeFree(_otaFirmwareJson);
     safeFree(_firmwareTokens);
     safeFree(_betaFirmwareTokens);
+    safeFree(_otaFirmwareTokens);
     safeFree(_latestManifest);
     safeFree(_latestFirmwareUrl);
     for (auto plist: _aptickets) {
@@ -1575,6 +1577,12 @@ void futurerestore::loadFirmwareTokens() {
         if (!_betaFirmwareJson) _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
         retassure(_betaFirmwareJson, "[TSSC] Could not get betas json\n");
         long cnt = parseTokens(_betaFirmwareJson, &_betaFirmwareTokens);
+        retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
+    }
+    if(!_otaFirmwareTokens) {
+        if (!_otaFirmwareJson) _otaFirmwareJson = getOtaJson();
+        retassure(_otaFirmwareJson, "[TSSC] Could not get otas json\n");
+        long cnt = parseTokens(_otaFirmwareJson, &_otaFirmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
     }
 }
@@ -1648,9 +1656,15 @@ char *futurerestore::getLatestManifest() {
         int i = 0;
         char **versions = nullptr;
         if(_useCustomLatestBuildID) {
-            versions = getListOfiOSForDevice2(_firmwareTokens, device, 0, &versionCnt, 1);
+            if(_useCustomLatestOTA) {
+                versions = getListOfiOSForDevice2(_otaFirmwareTokens, device, 1, &versionCnt, 1,
+                                                  _useCustomLatestBeta);
+            } else {
+                versions = getListOfiOSForDevice2(_firmwareTokens, device, 0, &versionCnt, 1,
+                                                  _useCustomLatestBeta);
+            }
         } else {
-            versions = getListOfiOSForDevice(_firmwareTokens, device, 0, &versionCnt);
+            versions = getListOfiOSForDevice(_firmwareTokens, device, 0, &versionCnt, _useCustomLatestBeta);
         }
         retassure(versionCnt, "[TSSC] failed finding latest firmware version\n");
         char *bpos = nullptr;
@@ -1707,15 +1721,26 @@ char *futurerestore::getLatestManifest() {
 
         if(_useCustomLatestBeta) {
             debug("[TSSC] selecting latest firmware version: %s\n", _customLatestBuildID.c_str());
-            _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
-            _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, _customLatestBuildID.c_str(), 0);
-        } else {
-            _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _firmwareTokens);
-            if(_useCustomLatestBuildID) {
-                _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, versVals.buildID, 0);
+            if(_useCustomLatestOTA) {
+                _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
             } else {
-                _latestManifest = getBuildManifest(_latestFirmwareUrl, device, versVals.version, versVals.buildID, 0);
+                _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
             }
+            _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
+        } else {
+            if(_useCustomLatestBuildID) {
+                if(_useCustomLatestOTA) {
+                    _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta,
+                                                        _useCustomLatestOTA);
+                } else {
+                    _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _firmwareTokens, _useCustomLatestBeta,
+                                                        _useCustomLatestOTA);
+                }
+            } else {
+                _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _firmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
+            }
+            _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, versVals.buildID,
+                                               _useCustomLatestOTA);
         }
         retassure(_latestFirmwareUrl, "Could not find url of latest firmware version\n");
         retassure(_latestManifest, "Could not get buildmanifest of latest firmware version\n");
@@ -1731,8 +1756,13 @@ char *futurerestore::getLatestFirmwareUrl() {
 void futurerestore::downloadLatestRose() {
     char *manifeststr = getLatestManifest();
     char *roseStr = (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) : nullptr);
+            "Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char otaString[1024]{};
     if (roseStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", roseStr);
+            roseStr = reinterpret_cast<char *>(&otaString);
+        }
         auto *digestString = getDigestOfElementInManifest("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(roseTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
         if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
@@ -1751,8 +1781,13 @@ void futurerestore::downloadLatestRose() {
 void futurerestore::downloadLatestSE() {
     char *manifeststr = getLatestManifest();
     char *seStr = (elemExists("SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), 0) : nullptr);
+            "SE,UpdatePayload", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char otaString[1024]{};
     if (seStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", seStr);
+            seStr = reinterpret_cast<char *>(&otaString);
+        }
         // TODO: SE caching how does ProductionUpdatePayloadHash work?
         info("Downloading SE firmware\n\n");
         retassure(!downloadPartialzip(getLatestFirmwareUrl(), seStr, seTempPath.c_str()),
@@ -1763,28 +1798,33 @@ void futurerestore::downloadLatestSE() {
 
 void futurerestore::downloadLatestSavage() {
     char *manifeststr = getLatestManifest();
-    char *savageB0ProdStr = (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
+    char *savageB0ProdStr = (elemExists("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                              ? getPathOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
                                                           0) : nullptr);
     char *savageB0DevStr = (elemExists("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
+                            ? getPathOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                             : nullptr);
     char *savageB2ProdStr = (elemExists("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
                              ? getPathOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
-                                                          0) : nullptr);
+                                                          _useCustomLatestOTA) : nullptr);
     char *savageB2DevStr = (elemExists("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
+                            ? getPathOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                             : nullptr);
     char *savageBAProdStr = (elemExists("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
                              ? getPathOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(),
-                                                          0) : nullptr);
+                                                          _useCustomLatestOTA) : nullptr);
     char *savageBADevStr = (elemExists("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0)
+                            ? getPathOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                             : nullptr);
     std::array<std::string, 6> savagePaths{};
 
 
+    char otaString[1024]{};
     if (savageB0ProdStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB0ProdStr);
+            savageB0ProdStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[0] = futurerestoreTempPath + "/savageB0PP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B0-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[0], 1);
@@ -1798,7 +1838,12 @@ void futurerestore::downloadLatestSavage() {
                       "Could not download Savage,B0-Prod-Patch\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (savageB0DevStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB0DevStr);
+            savageB0DevStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[1] = futurerestoreTempPath + "//savageB0DP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B0-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[1], 1);
@@ -1812,7 +1857,12 @@ void futurerestore::downloadLatestSavage() {
                       "Could not download Savage,B0-Dev-Patch\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (savageB2ProdStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB2ProdStr);
+            savageB2ProdStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[2] = futurerestoreTempPath + "//savageB2PP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B2-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[2], 1);
@@ -1826,7 +1876,12 @@ void futurerestore::downloadLatestSavage() {
                       "Could not download Savage,B2-Prod-Patch\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (savageB2DevStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageB2DevStr);
+            savageB2DevStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[3] = futurerestoreTempPath + "//savageB2DP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,B2-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[3], 1);
@@ -1840,7 +1895,12 @@ void futurerestore::downloadLatestSavage() {
                       "Could not download Savage,B2-Dev-Patch\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (savageBAProdStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageBAProdStr);
+            savageBAProdStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[4] = futurerestoreTempPath + "//savageBAPP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,BA-Prod-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[4], 1);
@@ -1854,7 +1914,12 @@ void futurerestore::downloadLatestSavage() {
                       "Could not download Savage,BA-Prod-Patch\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (savageBADevStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", savageBADevStr);
+            savageBADevStr = reinterpret_cast<char *>(&otaString);
+        }
         savagePaths[5] = futurerestoreTempPath + "//savageBADP.fw";
         auto *digestString = getDigestOfElementInManifest("Savage,BA-Dev-Patch", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(savagePaths[5], 1);
@@ -1881,13 +1946,17 @@ void futurerestore::downloadLatestSavage() {
 void futurerestore::downloadLatestVeridian() {
     char *manifeststr = getLatestManifest();
     char *veridianDGMStr = (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0)
+                            ? getPathOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                             : nullptr);
     char *veridianFWMStr = (elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0)
-                            ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0)
+                            ? getPathOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
                             : nullptr);
-
+    char otaString[1024]{};
     if (veridianDGMStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", veridianDGMStr);
+            veridianDGMStr = reinterpret_cast<char *>(&otaString);
+        }
         auto *digestString = getDigestOfElementInManifest("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0);
         unsigned char *hash = getSHA(veridianDGMTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
         if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
@@ -1900,7 +1969,12 @@ void futurerestore::downloadLatestVeridian() {
                       "Could not download Veridian DigestMap\n");
         }
     }
+    memset(otaString, 0, 1024);
     if (veridianFWMStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", veridianFWMStr);
+            veridianFWMStr = reinterpret_cast<char *>(&otaString);
+        }
         auto digestString = getDigestOfElementInManifest("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0);
         auto hash = getSHA(veridianFWMTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
         if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
@@ -1940,7 +2014,7 @@ void futurerestore::downloadLatestFirmwareComponents() {
 
 void futurerestore::downloadLatestBaseband() {
     auto manifeststr = getLatestManifest();
-    auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), 0);
+    auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr, getDeviceBoardNoCopy(), 0);
     uint32_t basebandSize;
     char *basebandData = readBaseband(basebandTempPath, basebandData, reinterpret_cast<size_t *>(&basebandSize));
@@ -1957,7 +2031,12 @@ void futurerestore::downloadLatestBaseband() {
             }
         }
     }
-    if(!cached) {
+    char otaString[1024]{};
+    if(!cached && pathStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", pathStr);
+            pathStr = reinterpret_cast<char *>(&otaString);
+        }
         info("Downloading Baseband\n\n");
         retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, basebandTempPath.c_str()),
                   "Could not download baseband\n");
@@ -1971,16 +2050,23 @@ void futurerestore::downloadLatestBaseband() {
 
 void futurerestore::downloadLatestSep() {
     auto manifestString = getLatestManifest();
-    auto pathString = getPathOfElementInManifest("SEP", manifestString, getDeviceBoardNoCopy(), 0);
-    auto *digestString = getDigestOfElementInManifest("SEP",manifestString,getDeviceBoardNoCopy(),0);
+    auto pathString = getPathOfElementInManifest("SEP", manifestString, getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *digestString = getDigestOfElementInManifest("SEP",manifestString,getDeviceBoardNoCopy(),_useCustomLatestOTA);
     auto *hash = getSHA(sepTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
     if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
         info("Using cached SEP.\n");
         safeFree(digestString);
         safeFree(hash);
     } else {
-        info("Downloading SEP\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathString, sepTempPath.c_str()), "Could not download SEP\n");
+        char otaString[1024]{};
+        if(pathString) {
+            if(_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", pathString);
+                pathString = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading SEP\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathString, sepTempPath.c_str()), "Could not download SEP\n");
+        }
     }
     saveStringToFile(manifestString, sepManifestTempPath);
     setSepPath(sepTempPath);
