@@ -1348,7 +1348,7 @@ void futurerestore::doRestore(const char *ipsw) {
         /* now we load the iBEC */
         retassure(!recovery_send_ibec(client, build_identity), "ERROR: Unable to send iBEC\n");
 
-        printf("waiting for device to reconnect... ");
+        debug("waiting for device to reconnect...\n");
         recovery_client_free(client);
 
         debug("Waiting for device to disconnect...\n");
@@ -1573,13 +1573,13 @@ void futurerestore::loadFirmwareTokens() {
         long cnt = parseTokens(_firmwareJson, &_firmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "ota" : "firmware");
     }
-    if(!_betaFirmwareTokens) {
+    if(!_betaFirmwareTokens && _useCustomLatestBeta) {
         if (!_betaFirmwareJson) _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
         retassure(_betaFirmwareJson, "[TSSC] Could not get betas json\n");
         long cnt = parseTokens(_betaFirmwareJson, &_betaFirmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
     }
-    if(!_otaFirmwareTokens) {
+    if(!_otaFirmwareTokens && _useCustomLatestOTA) {
         if (!_otaFirmwareJson) _otaFirmwareJson = getOtaJson();
         retassure(_otaFirmwareJson, "[TSSC] Could not get otas json\n");
         long cnt = parseTokens(_otaFirmwareJson, &_otaFirmwareTokens);
@@ -1722,7 +1722,24 @@ char *futurerestore::getLatestManifest() {
         if(_useCustomLatestBeta) {
             debug("[TSSC] selecting latest firmware version: %s\n", _customLatestBuildID.c_str());
             if(_useCustomLatestOTA) {
-                _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
+                t_versionURL *urls = getFirmwareUrls(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
+                while(urls && urls++->url) {
+                    char *manifeststr = getBuildManifest(urls->url, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
+                    if(!manifeststr) {
+                        continue;
+                    }
+                    plist_t manifest = nullptr;
+                    plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &manifest);
+                    plist_t ident = getBuildidentityWithBoardconfig(manifest, getDeviceBoardNoCopy(), _useCustomLatestOTA);
+                    if(ident) {
+                        _latestFirmwareUrl = urls->url;
+                        safeFree(urls->buildID);
+                        safeFree(urls->version);
+                        break;
+                    }
+                    safeFree(urls->buildID);
+                    safeFree(urls->version);
+                }
             } else {
                 _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
             }
@@ -1730,8 +1747,24 @@ char *futurerestore::getLatestManifest() {
         } else {
             if(_useCustomLatestBuildID) {
                 if(_useCustomLatestOTA) {
-                    _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta,
-                                                        _useCustomLatestOTA);
+                    t_versionURL *urls = getFirmwareUrls(device, &versVals, _otaFirmwareTokens, _useCustomLatestBeta, _useCustomLatestOTA);
+                    while(urls && urls++->url) {
+                        char *manifeststr = getBuildManifest(urls->url, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
+                        if(!manifeststr) {
+                            continue;
+                        }
+                        plist_t manifest = nullptr;
+                        plist_from_xml(manifeststr, (uint32_t) strlen(manifeststr), &manifest);
+                        plist_t ident = getBuildidentityWithBoardconfig(manifest, getDeviceBoardNoCopy(), _useCustomLatestOTA);
+                        if(ident) {
+                            _latestFirmwareUrl = urls->url;
+                            safeFree(urls->buildID);
+                            safeFree(urls->version);
+                            break;
+                        }
+                        safeFree(urls->buildID);
+                        safeFree(urls->version);
+                    }
                 } else {
                     _latestFirmwareUrl = getFirmwareUrl(device, &versVals, _firmwareTokens, _useCustomLatestBeta,
                                                         _useCustomLatestOTA);
@@ -2014,6 +2047,7 @@ void futurerestore::downloadLatestFirmwareComponents() {
 
 void futurerestore::downloadLatestBaseband() {
     auto manifeststr = getLatestManifest();
+    saveStringToFile(manifeststr, basebandManifestTempPath);
     auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr, getDeviceBoardNoCopy(), 0);
     uint32_t basebandSize;
@@ -2022,8 +2056,8 @@ void futurerestore::downloadLatestBaseband() {
     if(bbcfgDigestString != nullptr && basebandData != nullptr) {
         const char *bbcfgData = extractZipFileToString(basebandData, "bbcfg.mbn", &basebandSize);
         if(bbcfgData != nullptr) {
-            auto *hash = getSHABuffer((char *) bbcfgData, basebandSize, ((_client->device->chip_id < 0x8010) ? 3 : 1));
-            if(hash && bbcfgDigestString && !memcmp(bbcfgDigestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 32))) {
+            auto *hash = getSHABuffer((char *) bbcfgData, basebandSize, 1);
+            if(hash && bbcfgDigestString && !memcmp(bbcfgDigestString, hash, 32)) {
                 info("Using cached Baseband.\n");
                 safeFree(bbcfgDigestString);
                 safeFree(hash);
@@ -2041,7 +2075,6 @@ void futurerestore::downloadLatestBaseband() {
         retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathStr, basebandTempPath.c_str()),
                   "Could not download baseband\n");
     }
-    saveStringToFile(manifeststr, basebandManifestTempPath);
     setBasebandPath(basebandTempPath);
     setBasebandManifestPath(basebandManifestTempPath);
     loadBaseband(this->_basebandPath);
@@ -2050,6 +2083,7 @@ void futurerestore::downloadLatestBaseband() {
 
 void futurerestore::downloadLatestSep() {
     auto manifestString = getLatestManifest();
+    saveStringToFile(manifestString, sepManifestTempPath);
     auto pathString = getPathOfElementInManifest("SEP", manifestString, getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *digestString = getDigestOfElementInManifest("SEP",manifestString,getDeviceBoardNoCopy(),_useCustomLatestOTA);
     auto *hash = getSHA(sepTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
@@ -2068,7 +2102,6 @@ void futurerestore::downloadLatestSep() {
             retassure(!downloadPartialzip(getLatestFirmwareUrl(), pathString, sepTempPath.c_str()), "Could not download SEP\n");
         }
     }
-    saveStringToFile(manifestString, sepManifestTempPath);
     setSepPath(sepTempPath);
     setSepManifestPath(sepManifestTempPath);
     loadSep(this->_sepPath);
