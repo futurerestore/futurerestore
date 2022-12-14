@@ -75,6 +75,7 @@ class futurerestore {
     bool _useCustomLatestBuildID = false;
     bool _useCustomLatestBeta = false;
     bool _useCustomLatestOTA = false;
+    bool _useAppleDB = false;
     std::string _customLatest;
     std::string _customLatestBuildID;
     const char *_model = nullptr;

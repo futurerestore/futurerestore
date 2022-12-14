@@ -12,13 +12,17 @@ apt-get -yqq dist-upgrade
 apt-get install --no-install-recommends -yqq zstd curl gnupg2 lsb-release wget software-properties-common build-essential git autoconf automake libtool-bin pkg-config cmake zlib1g-dev libminizip-dev libpng-dev libreadline-dev libbz2-dev libudev-dev libudev1
 cp -RpP /usr/bin/ld /
 rm -rf /usr/bin/ld /usr/lib/x86_64-linux-gnu/lib{usb-1.0,png*,readline}.so*
-cd ${TMPDIR}/Builder/repos/futurerestore
+chown -R 0:0 ${BASE}
+cd ${BASE}
+ls -lath
 git submodule update --init --recursive
 cd ${WORKFLOW_ROOT}
 curl -sO https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
-./llvm.sh 13 all
-ln -sf /usr/bin/ld.lld-13 /usr/bin/ld
+./llvm.sh 15 all
+ln -sf /usr/bin/ld.lld-15 /usr/bin/ld
+ln -sf /usr/bin/clang-15 /usr/bin/clang
+ln -sf /usr/bin/clang++-15 /usr/bin/clang++
 curl -sO https://cdn.cryptiiiic.com/bootstrap/linux_fix.tar.zst &
 curl -sO https://cdn.cryptiiiic.com/deps/static/Linux/x86_64/Linux_x86_64_Release_Latest.tar.zst &
 curl -sO https://cdn.cryptiiiic.com/deps/static/Linux/x86_64/Linux_x86_64_Debug_Latest.tar.zst &
@@ -32,5 +36,5 @@ tar xf linux_fix.tar.zst -C ${TMPDIR}/Builder &
 tar xf cmake-3.23.2-linux-x86_64.tar.gz
 cp -RpP cmake-3.23.2-linux-x86_64/* /usr/local/ || true
 wait
-rm -rf "*.zst"
+rm -rf *.zst *.gz cmake-* llvm.sh
 cd ${WORKFLOW_ROOT}

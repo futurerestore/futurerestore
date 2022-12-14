@@ -469,7 +469,9 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
                     plist_free(gen);
                     plist_dict_set_item(cpy, "generator", gen_cpy);
                 }
-                if (gen_cpy != nullptr) plist_free(gen_cpy);
+                if (gen_cpy != nullptr) {
+                    plist_free(gen_cpy);
+                }
                 plist_free(apticket);
                 apticket = cpy;
             }
@@ -1575,7 +1577,16 @@ void futurerestore::loadFirmwareTokens() {
     }
     if(!_betaFirmwareTokens && _useCustomLatestBeta) {
         if (!_betaFirmwareJson) _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
-        retassure(_betaFirmwareJson, "[TSSC] Could not get betas json\n");
+        if(!_betaFirmwareJson) {
+            info("[TSSC] Could not get betas json, falling back to appledb\n");
+            _useAppleDB = true;
+            std::string type("iOS");
+            if(std::string(getDeviceModelNoCopy()).find("iPad") != std::string::npos) {
+                type = std::string("iPadOS");
+            }
+            _betaFirmwareJson = getBetaFirmwareJson2(type.c_str(), _customLatestBuildID.c_str());
+            retassure(_betaFirmwareJson, "[TSSC] Could not get betas json\n");
+        }
         long cnt = parseTokens(_betaFirmwareJson, &_betaFirmwareTokens);
         retassure(cnt > 0, "[TSSC] parsing %s.json failed\n", (0) ? "beta ota" : "beta firmware");
     }
@@ -1741,7 +1752,11 @@ char *futurerestore::getLatestManifest() {
                     safeFree(urls->version);
                 }
             } else {
-                _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
+                if(_useAppleDB) {
+                    _latestFirmwareUrl = getBetaURLForDevice2(_betaFirmwareTokens, getDeviceModelNoCopy());
+                } else {
+                    _latestFirmwareUrl = getBetaURLForDevice(_betaFirmwareTokens, _customLatestBuildID.c_str());
+                }
             }
             _latestManifest = getBuildManifest(_latestFirmwareUrl, device, nullptr, _customLatestBuildID.c_str(), _useCustomLatestOTA);
         } else {
@@ -2050,11 +2065,11 @@ void futurerestore::downloadLatestBaseband() {
     saveStringToFile(manifeststr, basebandManifestTempPath);
     auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr, getDeviceBoardNoCopy(), 0);
-    uint32_t basebandSize;
-    char *basebandData = readBaseband(basebandTempPath, basebandData, reinterpret_cast<size_t *>(&basebandSize));
+    size_t basebandSize = 0;
+    char *basebandData = readBaseband(basebandTempPath, basebandData, &basebandSize);
     bool cached = false;
     if(bbcfgDigestString != nullptr && basebandData != nullptr) {
-        const char *bbcfgData = extractZipFileToString(basebandData, "bbcfg.mbn", &basebandSize);
+        const char *bbcfgData = extractZipFileToString(basebandData, "bbcfg.mbn", (uint32_t *)&basebandSize);
         if(bbcfgData != nullptr) {
             auto *hash = getSHABuffer((char *) bbcfgData, basebandSize, 1);
             if(hash && bbcfgDigestString && !memcmp(bbcfgDigestString, hash, 32)) {
