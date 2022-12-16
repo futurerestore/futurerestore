@@ -16,13 +16,19 @@ jobs:
     env:
       PROCURSUS: /opt/procursus
       PATH: /opt/procursus/bin:/opt/procursus/libexec/gnubin:/usr/local/lib/ruby/gems/2.7.0/bin:/usr/local/opt/ruby@2.7/bin:/usr/local/opt/pipx_bin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Users/runner/Library/Android/sdk/ndk-bundle:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools:/Users/runner/.ghcup/bin:/Users/runner/hostedtoolcache/stack/2.7.3/x64
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
     - name: Checkout
+      id: Checkout
       uses: actions/checkout@v2
       with:
         submodules: 'true'
         fetch-depth: 0
+    - name: Update Xcode
+      id: Update-Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '14.1.0'
     - name: macOS Build
       id: macOS-Build
       run: |
@@ -62,6 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        id: Checkout
         uses: actions/checkout@v2
         with:
           submodules: 'true'
@@ -78,13 +85,16 @@ jobs:
             /tmp/Builder/repos/futurerestore/.github/workflows/linux-post.sh
             mkdir -p ${{ github.workspace }}/.github/workflows/
       - name: Linux x86_64 RELEASE Build
+        id: Linux-x86_64-RELEASE-Build
         run: |
           sudo chown -R $USER:$USER ${{ github.workspace }}/../
           mv ${{ github.workspace }}/.github/workflows/futurerestore1.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name1.txt)
       - name: Linux x86_64 DEBUG Build
+        id: Linux-x86_64-DEBUG-Build
         run: |
           mv ${{ github.workspace }}/.github/workflows/futurerestore2.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name2.txt)
       - name: Linux x86_64 ASAN Build
+        id: Linux-x86_64-ASAN-Build
         run: |
           mv ${{ github.workspace }}/.github/workflows/futurerestore3.tar.xz ${{ github.workspace }}/.github/workflows/$(cat ${{ github.workspace }}/.github/workflows/name3.txt)
       - name: futurerestore Linux x86_64 RELEASE Archive
