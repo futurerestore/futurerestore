@@ -364,7 +364,6 @@ int main_r(int argc, const char * argv[]) {
         if(!customLatestBuildID.empty()) {
             client.setCustomLatestBuildID(customLatestBuildID, (flags & FLAG_CUSTOM_LATEST_BETA) != 0, (flags & FLAG_CUSTOM_LATEST_OTA) != 0);
         }
-
         if (!(
                 ((!apticketPaths.empty() && ipsw)
                  && ((basebandPath && basebandManifestPath) || ((flags & FLAG_LATEST_BASEBAND) || (flags & FLAG_NO_BASEBAND)))
@@ -412,23 +411,27 @@ int main_r(int argc, const char * argv[]) {
         if(flags & FLAG_SKIP_BLOB) {
             client.skipBlobValidation();
         }
-
-        if (flags & FLAG_LATEST_SEP){
-            info("User specified to use latest signed SEP\n");
-            client.downloadLatestSep();
-        }else if (!client.is32bit()){
-            client.setSepPath(sepPath);
-            client.setSepManifestPath(sepManifestPath);
-            client.loadSep(sepPath);
-            client.loadSepManifest(sepManifestPath);
+        if(!(flags & FLAG_SET_NONCE)) {
+            if (flags & FLAG_LATEST_SEP) {
+                info("User specified to use latest signed SEP\n");
+                client.downloadLatestSep();
+            } else if (!client.is32bit()) {
+                client.setSepPath(sepPath);
+                client.setSepManifestPath(sepManifestPath);
+                client.loadSep(sepPath);
+                client.loadSepManifest(sepManifestPath);
+            }
         }
 
         versVals.basebandMode = kBasebandModeWithoutBaseband;
-        info("Checking if SEP is being signed...\n");
-        if (!client.is32bit() && !(isManifestSignedForDevice(client.getSepManifestPath().c_str(), &devVals, &versVals, nullptr))) {
-            reterror("SEP firmware is NOT being signed!\n");
-        } else {
-            info("SEP is being signed!\n");
+        if(!(flags & FLAG_SET_NONCE)) {
+            info("Checking if SEP is being signed...\n");
+            if (!client.is32bit() &&
+                !(isManifestSignedForDevice(client.getSepManifestPath().c_str(), &devVals, &versVals, nullptr))) {
+                reterror("SEP firmware is NOT being signed!\n");
+            } else {
+                info("SEP is being signed!\n");
+            }
         }
         if (flags & FLAG_NO_BASEBAND){
             info("\nWARNING: user specified is not to flash a baseband. This can make the restore fail if the device needs a baseband!\n");
@@ -442,31 +445,36 @@ int main_r(int argc, const char * argv[]) {
             }
             info("");
         }else{
-            if (flags & FLAG_LATEST_BASEBAND){
-                info("User specified to use latest signed baseband\n");
-                client.downloadLatestBaseband();
-            }else{
-                client.setBasebandPath(basebandPath);
-                client.setBasebandManifestPath(basebandManifestPath);
-                client.loadBaseband(basebandPath);
-                client.loadBasebandManifest(basebandManifestPath);
-                info("Did set SEP and baseband path and firmware\n");
+            if(!(flags & FLAG_SET_NONCE)) {
+                if (flags & FLAG_LATEST_BASEBAND) {
+                    info("User specified to use latest signed baseband\n");
+                    client.downloadLatestBaseband();
+                } else {
+                    client.setBasebandPath(basebandPath);
+                    client.setBasebandManifestPath(basebandManifestPath);
+                    client.loadBaseband(basebandPath);
+                    client.loadBasebandManifest(basebandManifestPath);
+                    info("Did set SEP and baseband path and firmware\n");
+                }
             }
 
             versVals.basebandMode = kBasebandModeOnlyBaseband;
             if (!(devVals.bbgcid = client.getBasebandGoldCertIDFromDevice())){
                 debug("[WARNING] using tsschecker's fallback to get BasebandGoldCertID. This might result in invalid baseband signing status information\n");
             }
-            info("Checking if Baseband is being signed...\n");
-            if (!(isManifestSignedForDevice(client.getBasebandManifestPath().c_str(), &devVals, &versVals, nullptr))) {
-                reterror("Baseband firmware is NOT being signed!\n");
-            } else {
-                info("Baseband is being signed!\n");
+            if(!(flags & FLAG_SET_NONCE)) {
+                info("Checking if Baseband is being signed...\n");
+                if (!(isManifestSignedForDevice(client.getBasebandManifestPath().c_str(), &devVals, &versVals,
+                                                nullptr))) {
+                    reterror("Baseband firmware is NOT being signed!\n");
+                } else {
+                    info("Baseband is being signed!\n");
+                }
             }
         }
-
-        if(!client.is32bit())
+        if(!client.is32bit() && !(flags & FLAG_SET_NONCE)) {
             client.downloadLatestFirmwareComponents();
+        }
         client.putDeviceIntoRecovery();
         if (flags & FLAG_WAIT){
             client.waitForNonce();

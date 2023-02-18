@@ -72,3 +72,4 @@ xcuserdata
 .cmake
 Testing
 *.cbp
+cmake-build-relwithdebinfo

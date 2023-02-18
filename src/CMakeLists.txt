@@ -1,10 +1,5 @@
-project(futurerestore)
-set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 20)
+cmake_minimum_required(VERSION 3.19...3.24 FATAL_ERROR)
+project(futurerestore VERSION 2.0.0 LANGUAGES C CXX)
 add_executable(futurerestore
         main.cpp
         futurerestore.cpp)
@@ -13,7 +8,7 @@ target_include_directories(futurerestore PRIVATE
         "${CMAKE_SOURCE_DIR}/external/tsschecker/external/jssy/jssy"
         "${CMAKE_SOURCE_DIR}/external/tsschecker/tsschecker")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
-if(NOT NO_PKGCFG AND NOT "$ENV{NO_PKGCFG}" MATCHES "1")
+if(NOT NO_PKGCFG)
     pkg_check_modules(DEPS REQUIRED
             libzip
             zlib

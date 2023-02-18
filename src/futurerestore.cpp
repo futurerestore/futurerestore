@@ -102,6 +102,14 @@ std::string roseTempPath = futurerestoreTempPath + "/rose.bin";
 std::string seTempPath = futurerestoreTempPath + "/se.sefw";
 std::string veridianDGMTempPath = futurerestoreTempPath + "/veridianDGM.der";
 std::string veridianFWMTempPath = futurerestoreTempPath + "/veridianFWM.plist";
+std::string timerTempPath = futurerestoreTempPath + "/timer.bin";
+std::string baobabTempPath = futurerestoreTempPath + "/baobab.bin";
+std::string cryptex1SysOSTempPath = futurerestoreTempPath + "/cryptex1SysOS.dmg";
+std::string cryptex1SysVOLTempPath = futurerestoreTempPath + "/cryptex1SysVOL.dmg.root_hash";
+std::string cryptex1SysTCTempPath = futurerestoreTempPath + "/cryptex1SysTC.dmg.trustcache";
+std::string cryptex1AppOSTempPath = futurerestoreTempPath + "/cryptex1AppOS.dmg";
+std::string cryptex1AppVOLTempPath = futurerestoreTempPath + "/cryptex1AppVOL.dmg.root_hash";
+std::string cryptex1AppTCTempPath = futurerestoreTempPath + "/cryptex1AppTC.dmg.trustcache";
 std::string basebandTempPath = futurerestoreTempPath + "/baseband.bbfw";
 std::string basebandManifestTempPath = futurerestoreTempPath + "/basebandManifest.plist";
 std::string sepTempPath = futurerestoreTempPath + "/sep.im4p";
@@ -152,6 +160,14 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
             seTempPath = futurerestoreTempPath + "/se.sefw";
             veridianDGMTempPath = futurerestoreTempPath + "/veridianDGM.der";
             veridianFWMTempPath = futurerestoreTempPath + "/veridianFWM.plist";
+            timerTempPath = futurerestoreTempPath + "/timer.bin";
+            baobabTempPath = futurerestoreTempPath + "/baobab.bin";
+            cryptex1SysOSTempPath = futurerestoreTempPath + "/cryptex1SysOS.dmg";
+            cryptex1SysVOLTempPath = futurerestoreTempPath + "/cryptex1SysVOL.dmg.root_hash";
+            cryptex1SysTCTempPath = futurerestoreTempPath + "/cryptex1SysTC.dmg.trustcache";
+            cryptex1AppOSTempPath = futurerestoreTempPath + "/cryptex1AppOS.dmg";
+            cryptex1AppVOLTempPath = futurerestoreTempPath + "/cryptex1AppVOL.dmg.root_hash";
+            cryptex1AppTCTempPath = futurerestoreTempPath + "/cryptex1AppTC.dmg.trustcache";
             basebandTempPath = futurerestoreTempPath + "/baseband.bbfw";
             basebandManifestTempPath = futurerestoreTempPath + "/basebandManifest.plist";
             sepTempPath = futurerestoreTempPath + "/sep.im4p";
@@ -184,6 +200,13 @@ bool futurerestore::init() {
             info("[INFO] 64-bit device detected\n");
         }
     }
+    if(_client) {
+        dfu_client_free(_client);
+    }
+    if(_client) {
+        recovery_client_free(_client);
+    }
+    getDeviceMode(true);
 #ifdef __APPLE__
     daemonManager(false);
 #endif
@@ -463,14 +486,12 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
         if (_isUpdateInstall) {
             if (plist_t update = plist_dict_get_item(apticket, "updateInstall")) {
                 plist_t cpy = plist_copy(update);
+                plist_free(update);
                 plist_t gen_cpy = nullptr;
                 if (plist_t gen = plist_dict_get_item(apticket, "generator")) {
                     gen_cpy = plist_copy(gen);
                     plist_free(gen);
                     plist_dict_set_item(cpy, "generator", gen_cpy);
-                }
-                if (gen_cpy != nullptr) {
-                    plist_free(gen_cpy);
                 }
                 plist_free(apticket);
                 apticket = cpy;
@@ -927,12 +948,20 @@ void futurerestore::doRestore(const char *ipsw) {
     if (_noRSEP) client->flags |= FLAG_NO_RSEP;
     if (!_isUpdateInstall) client->flags |= FLAG_ERASE;
 
-    irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, client);
-    idevice_event_subscribe(idevice_event_cb, client);
-    client->idevice_e_ctx = (void *) idevice_event_cb;
+    if(!client->idevice_e_ctx) {
+        irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, client);
+        idevice_event_subscribe(idevice_event_cb, client);
+        client->idevice_e_ctx = (void *) idevice_event_cb;
+    }
 
     mutex_lock(&client->device_event_mutex);
-    cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+    client->ignore_device_add_events = 0;
+    unsigned int timeout = 10000;
+    // 1337 epic speed hax
+    if(client->mode != MODE_UNKNOWN) {
+        timeout = 1;
+    }
+    cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, timeout);
 
     retassure(client->mode != MODE_UNKNOWN, "Unable to discover device mode. Please make sure a device is attached.\n");
     if (client->mode != MODE_RECOVERY) {
@@ -941,9 +970,8 @@ void futurerestore::doRestore(const char *ipsw) {
     } else {
         retassure(!_enterPwnRecoveryRequested, "--use-pwndfu was specified, but device found in recovery mode!");
     }
-
-    info("Found device in %s mode\n", client->mode->string);
     mutex_unlock(&client->device_event_mutex);
+    info("Found device in %s mode\n", client->mode->string);
 
     info("Identified device as %s, %s\n", getDeviceBoardNoCopy(), getDeviceModelNoCopy());
 
@@ -987,7 +1015,7 @@ void futurerestore::doRestore(const char *ipsw) {
                                                                _isUpdateInstall),
               "ERROR: Unable to find any build identities for iPSW\n");
 
-    if (_client->image4supported) {
+    if (_client->image4supported && !_setNonce) {
         if (!(client->sepBuildIdentity = getBuildidentityWithBoardconfig(_sepbuildmanifest,
                                                                          client->device->hardware_model,
                                                                          _isUpdateInstall))) {
@@ -1102,7 +1130,7 @@ void futurerestore::doRestore(const char *ipsw) {
         plist_get_data_val(digest, &manifestDigest, &manifestDigestSize);
 
         if (tickethashSize == manifestDigestSize && memcmp(tickethash, manifestDigest, tickethashSize) == 0) {
-            printf("Verified APTicket to be valid for this restore\n");
+            info("Verified APTicket to be valid for this restore\n");
             free(manifestDigest);
         } else {
             free(manifestDigest);
@@ -1134,7 +1162,7 @@ void futurerestore::doRestore(const char *ipsw) {
         warning("WARNING: we don't have a BasebandBuildManifest, won't flash baseband!\n");
     }
 
-    if (_client->image4supported) {
+    if (_client->image4supported && !_setNonce) {
         //check SEP
         plist_t sep_manifest = plist_dict_get_item(client->sepBuildIdentity, "Manifest");
         plist_t sep_sep = plist_copy(plist_dict_get_item(sep_manifest, "SEP"));
@@ -1399,7 +1427,7 @@ void futurerestore::doRestore(const char *ipsw) {
         recovery_client_free(client);
     }
 
-    if (_client->image4supported) {
+    if (_client->image4supported && !_setNonce) {
         info("getting SEP ticket\n");
         retassure(!get_tss_response(client, client->sepBuildIdentity, &client->septss),
                   "ERROR: Unable to get signing tickets for SEP\n");
@@ -1801,6 +1829,11 @@ char *futurerestore::getLatestFirmwareUrl() {
     return getLatestManifest(), _latestFirmwareUrl;
 }
 
+void inline futurerestore::test() const {
+    info("DEBUG: 1337: device: %p\n", _client->device);
+    assert(_client->device);
+}
+
 void futurerestore::downloadLatestRose() {
     char *manifeststr = getLatestManifest();
     char *roseStr = (elemExists("Rap,RTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
@@ -2039,6 +2072,362 @@ void futurerestore::downloadLatestVeridian() {
         loadVeridian(veridianDGMTempPath, veridianFWMTempPath);
 }
 
+void futurerestore::downloadLatestTimer() {
+    char *manifeststr = getLatestManifest();
+    char *timerStr = (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char otaString[1024]{};
+    if (timerStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", timerStr);
+            timerStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Timer firmware\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), timerStr, timerTempPath.c_str()),
+                  "Could not download Timer\n");
+        loadTimer(timerTempPath);
+    }
+}
+
+void futurerestore::downloadLatestBaobab() {
+    char *manifeststr = getLatestManifest();
+    char *baobabStr = (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char otaString[1024]{};
+    if (baobabStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", baobabStr);
+            baobabStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Baobab firmware\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), baobabStr, baobabTempPath.c_str()),
+                  "Could not download Baobab\n");
+        loadBaobab(baobabTempPath);
+    }
+}
+
+void futurerestore::downloadLatestYonkers() {
+    char *manifeststr = getLatestManifest();
+    char *yonkers0Str = (elemExists("Yonkers,SysTopPatch0", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                             ? getPathOfElementInManifest("Yonkers,SysTopPatch0", manifeststr, getDeviceBoardNoCopy(),
+                                                          0) : nullptr);
+    char *yonkers1Str = (elemExists("Yonkers,SysTopPatch1", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch1", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers2Str = (elemExists("Yonkers,SysTopPatch2", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch2", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers3Str = (elemExists("Yonkers,SysTopPatch3", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch3", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers4Str = (elemExists("Yonkers,SysTopPatch4", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch4", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers5Str = (elemExists("Yonkers,SysTopPatch5", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch5", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers6Str = (elemExists("Yonkers,SysTopPatch6", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch6", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers7Str = (elemExists("Yonkers,SysTopPatch7", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch7", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers8Str = (elemExists("Yonkers,SysTopPatch8", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch8", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkers9Str = (elemExists("Yonkers,SysTopPatch9", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatch9", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersAStr = (elemExists("Yonkers,SysTopPatchA", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchA", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersBStr = (elemExists("Yonkers,SysTopPatchB", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchB", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersCStr = (elemExists("Yonkers,SysTopPatchC", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchC", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersDStr = (elemExists("Yonkers,SysTopPatchD", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchD", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersEStr = (elemExists("Yonkers,SysTopPatchE", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchE", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    char *yonkersFStr = (elemExists("Yonkers,SysTopPatchF", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA)
+                         ? getPathOfElementInManifest("Yonkers,SysTopPatchF", manifeststr, getDeviceBoardNoCopy(),
+                                                      0) : nullptr);
+    std::array<std::string, 16> yonkersPaths{};
+
+
+    char otaString[1024]{};
+    if (yonkers0Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers0Str);
+            yonkers0Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[0] = futurerestoreTempPath + "/yonkers0.fw";
+            info("Downloading Yonkers,SysTopPatch0\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers0Str, yonkersPaths[0].c_str()),
+                      "Could not download Yonkers,SysTopPatch0\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers1Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers1Str);
+            yonkers1Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[1] = futurerestoreTempPath + "/yonkers1.fw";
+        info("Downloading Yonkers,SysTopPatch1\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers1Str, yonkersPaths[1].c_str()),
+                  "Could not download Yonkers,SysTopPatch1\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers2Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers2Str);
+            yonkers2Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[2] = futurerestoreTempPath + "/yonkers2.fw";
+        info("Downloading Yonkers,SysTopPatch2\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers2Str, yonkersPaths[2].c_str()),
+                  "Could not download Yonkers,SysTopPatch2\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers3Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers3Str);
+            yonkers3Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[3] = futurerestoreTempPath + "/yonkers3.fw";
+        info("Downloading Yonkers,SysTopPatch3\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers3Str, yonkersPaths[3].c_str()),
+                  "Could not download Yonkers,SysTopPatch3\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers4Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers4Str);
+            yonkers4Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[4] = futurerestoreTempPath + "/yonkers4.fw";
+        info("Downloading Yonkers,SysTopPatch4\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers4Str, yonkersPaths[4].c_str()),
+                  "Could not download Yonkers,SysTopPatch4\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers5Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers5Str);
+            yonkers5Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[5] = futurerestoreTempPath + "/yonkers5.fw";
+        info("Downloading Yonkers,SysTopPatch5\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers5Str, yonkersPaths[5].c_str()),
+                  "Could not download Yonkers,SysTopPatch5\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers6Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers6Str);
+            yonkers6Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[6] = futurerestoreTempPath + "/yonkers6.fw";
+        info("Downloading Yonkers,SysTopPatch6\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers6Str, yonkersPaths[6].c_str()),
+                  "Could not download Yonkers,SysTopPatch6\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers7Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers7Str);
+            yonkers7Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[7] = futurerestoreTempPath + "/yonkers7.fw";
+        info("Downloading Yonkers,SysTopPatch7\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers7Str, yonkersPaths[7].c_str()),
+                  "Could not download Yonkers,SysTopPatch7\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers8Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers8Str);
+            yonkers8Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[8] = futurerestoreTempPath + "/yonkers8.fw";
+        info("Downloading Yonkers,SysTopPatch8\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers8Str, yonkersPaths[8].c_str()),
+                  "Could not download Yonkers,SysTopPatch8\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkers9Str) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkers9Str);
+            yonkers9Str = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[9] = futurerestoreTempPath + "/yonkers9.fw";
+        info("Downloading Yonkers,SysTopPatch9\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkers9Str, yonkersPaths[9].c_str()),
+                  "Could not download Yonkers,SysTopPatch9\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersAStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersAStr);
+            yonkersAStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[10] = futurerestoreTempPath + "/yonkersA.fw";
+        info("Downloading Yonkers,SysTopPatchA\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersAStr, yonkersPaths[10].c_str()),
+                  "Could not download Yonkers,SysTopPatchA\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersBStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersBStr);
+            yonkersBStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[11] = futurerestoreTempPath + "/yonkersB.fw";
+        info("Downloading Yonkers,SysTopPatchB\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersBStr, yonkersPaths[11].c_str()),
+                  "Could not download Yonkers,SysTopPatchB\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersCStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersCStr);
+            yonkersCStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[12] = futurerestoreTempPath + "/yonkersC.fw";
+        info("Downloading Yonkers,SysTopPatchC\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersCStr, yonkersPaths[12].c_str()),
+                  "Could not download Yonkers,SysTopPatchC\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersDStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersDStr);
+            yonkersDStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[13] = futurerestoreTempPath + "/yonkersD.fw";
+        info("Downloading Yonkers,SysTopPatchD\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersDStr, yonkersPaths[13].c_str()),
+                  "Could not download Yonkers,SysTopPatchD\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersEStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersEStr);
+            yonkersEStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[14] = futurerestoreTempPath + "/yonkersE.fw";
+        info("Downloading Yonkers,SysTopPatchE\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersEStr, yonkersPaths[14].c_str()),
+                  "Could not download Yonkers,SysTopPatchE\n");
+    }
+    memset(otaString, 0, 1024);
+    if (yonkersFStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", yonkersFStr);
+            yonkersFStr = reinterpret_cast<char *>(&otaString);
+        }
+        yonkersPaths[15] = futurerestoreTempPath + "/yonkersF.fw";
+        info("Downloading Yonkers,SysTopPatchF\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), yonkersFStr, yonkersPaths[15].c_str()),
+                  "Could not download Yonkers,SysTopPatchF\n");
+    }
+    if (yonkers0Str &&
+            yonkers0Str &&
+            yonkers1Str &&
+            yonkers2Str &&
+            yonkers3Str &&
+            yonkers4Str &&
+            yonkers5Str &&
+            yonkers6Str &&
+            yonkers7Str &&
+            yonkers8Str &&
+            yonkers9Str &&
+            yonkersAStr &&
+            yonkersBStr &&
+            yonkersCStr &&
+            yonkersDStr &&
+            yonkersEStr &&
+            yonkersFStr) {
+        loadYonkers(yonkersPaths);
+    }
+}
+
+void futurerestore::downloadLatestCryptex1() {
+    char *manifeststr = getLatestManifest();
+    char *cryptex1SysOSStr = (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1SysVOLStr = (elemExists("Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1SysTCStr = (elemExists("Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1AppOSStr = (elemExists("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1AppVOLStr = (elemExists("Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1AppTCStr = (elemExists("Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
+            "Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char otaString[1024]{};
+    if (cryptex1SysOSStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysOSStr);
+            cryptex1SysOSStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,SystemOS dmg(this may take a while)\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysOSStr, cryptex1SysOSTempPath.c_str()),
+                  "Could not download Cryptex1,SystemOS\n");
+    }
+    if (cryptex1SysVOLStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysVOLStr);
+            cryptex1SysVOLStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,SystemVolume root_hash\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysVOLStr, cryptex1SysVOLTempPath.c_str()),
+                  "Could not download Cryptex1,SystemVolume\n");
+    }
+    if (cryptex1SysTCStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysTCStr);
+            cryptex1SysTCStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,SystemTrustCache\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysTCStr, cryptex1SysTCTempPath.c_str()),
+                  "Could not download Cryptex1,SystemTrustCache\n");
+    }
+    if (cryptex1AppOSStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppOSStr);
+            cryptex1AppOSStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,AppOS dmg\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppOSStr, cryptex1AppOSTempPath.c_str()),
+                  "Could not download Cryptex1,AppOS\n");
+    }
+    if (cryptex1AppVOLStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppVOLStr);
+            cryptex1AppVOLStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,AppVolume root_hash\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppVOLStr, cryptex1AppVOLTempPath.c_str()),
+                  "Could not download Cryptex1,AppVolume\n");
+    }
+    if (cryptex1AppTCStr) {
+        if(_useCustomLatestOTA) {
+            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppTCStr);
+            cryptex1AppTCStr = reinterpret_cast<char *>(&otaString);
+        }
+        info("Downloading Cryptex1,AppTrustCache\n\n");
+        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppTCStr, cryptex1AppTCTempPath.c_str()),
+                  "Could not download Cryptex1,AppTrustCache\n");
+    }
+    loadCryptex1(cryptex1SysOSTempPath, cryptex1SysVOLTempPath, cryptex1SysTCTempPath, cryptex1AppOSTempPath, cryptex1AppVOLTempPath, cryptex1AppTCTempPath);
+}
+
 void futurerestore::downloadLatestFirmwareComponents() {
     info("Downloading the latest firmware components...\n");
     char *manifeststr = getLatestManifest();
@@ -2057,6 +2446,14 @@ void futurerestore::downloadLatestFirmwareComponents() {
     if (elemExists("BMU,DigestMap", manifeststr, getDeviceBoardNoCopy(), 0) ||
         elemExists("BMU,FirmwareMap", manifeststr, getDeviceBoardNoCopy(), 0))
         downloadLatestVeridian();
+    if (elemExists("Timer,RestoreRTKitOS", manifeststr, getDeviceBoardNoCopy(), 0))
+        downloadLatestTimer();
+    if (elemExists("Baobab,TCON", manifeststr, getDeviceBoardNoCopy(), 0))
+        downloadLatestBaobab();
+    if (elemExists("Yonkers,PatchEpoch", manifeststr, getDeviceBoardNoCopy(), 0))
+        downloadLatestYonkers();
+    if (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0))
+        downloadLatestCryptex1();
     info("Finished downloading the latest firmware components!\n");
 }
 
@@ -2066,7 +2463,8 @@ void futurerestore::downloadLatestBaseband() {
     auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr, getDeviceBoardNoCopy(), 0);
     size_t basebandSize = 0;
-    char *basebandData = readBaseband(basebandTempPath, basebandData, &basebandSize);
+    char *basebandData = nullptr;
+    basebandData = readBaseband(basebandTempPath, basebandData, &basebandSize);
     bool cached = false;
     if(bbcfgDigestString != nullptr && basebandData != nullptr) {
         const char *bbcfgData = extractZipFileToString(basebandData, "bbcfg.mbn", (uint32_t *)&basebandSize);
@@ -2123,19 +2521,19 @@ void futurerestore::downloadLatestSep() {
     loadSepManifest(this->_sepManifestPath);
 }
 
-void futurerestore::loadSepManifest(std::string sepManifestPath) {
+void futurerestore::loadSepManifest(const std::string& sepManifestPath) {
     this->_sepManifestPath = sepManifestPath;
     retassure(_sepbuildmanifest = loadPlistFromFile(sepManifestPath.c_str()),
               "Failed to load SEP Manifest");
 }
 
-void futurerestore::loadBasebandManifest(std::string basebandManifestPath) {
+void futurerestore::loadBasebandManifest(const std::string& basebandManifestPath) {
     this->_basebandManifestPath = basebandManifestPath;
     retassure(_basebandbuildmanifest = loadPlistFromFile(basebandManifestPath.c_str()),
               "Failed to load Baseband Manifest");
 };
 
-void futurerestore::loadRose(std::string rosePath) {
+void futurerestore::loadRose(const std::string& rosePath) const {
     std::ifstream roseFileStream(rosePath, std::ios::in | std::ios::binary | std::ios::ate);
     retassure(roseFileStream.good(), "%s: failed init file stream for %s!\n", __func__, rosePath.c_str());
     _client->rosefwdatasize = roseFileStream.tellg();
@@ -2151,7 +2549,7 @@ void futurerestore::loadRose(std::string rosePath) {
               __func__, rosePath.c_str(), _client->rosefwdatasize);
 }
 
-void futurerestore::loadSE(std::string sePath) {
+void futurerestore::loadSE(const std::string& sePath) const {
     std::ifstream seFileStream(sePath, std::ios::in | std::ios::binary | std::ios::ate);
     retassure(seFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sePath.c_str());
     _client->sefwdatasize = seFileStream.tellg();
@@ -2167,7 +2565,7 @@ void futurerestore::loadSE(std::string sePath) {
               __func__, sePath.c_str(), _client->sefwdatasize);
 }
 
-void futurerestore::loadSavage(std::array<std::string, 6> savagePaths) {
+void futurerestore::loadSavage(const std::array<std::string, 6>& savagePaths) const {
     int index = 0;
     for (const auto &savagePath: savagePaths) {
         std::ifstream savageFileStream(savagePath, std::ios::in | std::ios::binary | std::ios::ate);
@@ -2187,7 +2585,7 @@ void futurerestore::loadSavage(std::array<std::string, 6> savagePaths) {
     }
 }
 
-void futurerestore::loadVeridian(std::string veridianDGMPath, std::string veridianFWMPath) {
+void futurerestore::loadVeridian(const std::string& veridianDGMPath, std::string veridianFWMPath) const {
     std::ifstream veridianDGMFileStream(veridianDGMPath, std::ios::in | std::ios::binary | std::ios::ate);
     std::ifstream veridianFWMFileStream(veridianFWMPath, std::ios::in | std::ios::binary | std::ios::ate);
     retassure(veridianDGMFileStream.good(), "%s: failed init file stream for %s!\n", __func__, veridianDGMPath.c_str());
@@ -2218,7 +2616,149 @@ void futurerestore::loadVeridian(std::string veridianDGMPath, std::string veridi
               __func__, veridianFWMPath.c_str(), _client->veridianfwmfwdatasize);
 }
 
-void futurerestore::loadRamdisk(std::string ramdiskPath) {
+void futurerestore::loadTimer(const std::string& timerPath) const {
+    std::ifstream timerFileStream(timerPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(timerFileStream.good(), "%s: failed init file stream for %s!\n", __func__, timerPath.c_str());
+    _client->timerfwdatasize = timerFileStream.tellg();
+    _client->rtimerfwdatasize = timerFileStream.tellg();
+    timerFileStream.seekg(0, std::ios_base::beg);
+    std::allocator<uint8_t> alloc;
+    retassure(_client->timerfwdata = (char *)alloc.allocate(_client->timerfwdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, timerPath.c_str());
+    retassure(_client->rtimerfwdata = (char *)alloc.allocate(_client->rtimerfwdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, timerPath.c_str());
+    timerFileStream.read((char *) _client->timerfwdata,
+                      (std::streamsize) _client->timerfwdatasize);
+    retassure(timerFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, timerPath.c_str());
+    retassure(*(uint64_t *) (_client->timerfwdata) != 0,
+              "%s: failed to load Timer for %s with the size %zu!\n",
+              __func__, timerPath.c_str(), _client->timerfwdatasize);
+    timerFileStream.read((char *) _client->rtimerfwdata,
+                      (std::streamsize) _client->rtimerfwdatasize);
+    retassure(timerFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, timerPath.c_str());
+    retassure(*(uint64_t *) (_client->rtimerfwdata) != 0,
+              "%s: failed to load Timer for %s with the size %zu!\n",
+              __func__, timerPath.c_str(), _client->rtimerfwdatasize);
+}
+
+void futurerestore::loadBaobab(const std::string& baobabPath) const {
+    std::ifstream baobobFileStream(baobabPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(baobobFileStream.good(), "%s: failed init file stream for %s!\n", __func__, baobabPath.c_str());
+    _client->baobabfwdatasize = baobobFileStream.tellg();
+    baobobFileStream.seekg(0, std::ios_base::beg);
+    std::allocator<uint8_t> alloc;
+    retassure(_client->baobabfwdata = (char *)alloc.allocate(_client->baobabfwdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, baobabPath.c_str());
+    baobobFileStream.read((char *) _client->baobabfwdata,
+                      (std::streamsize) _client->baobabfwdatasize);
+    retassure(baobobFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, baobabPath.c_str());
+    retassure(*(uint64_t *) (_client->baobabfwdata) != 0,
+              "%s: failed to load Baobab for %s with the size %zu!\n",
+              __func__, baobabPath.c_str(), _client->baobabfwdatasize);
+}
+
+void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std::string& cryptex1SysVOLPath, const std::string& cryptex1SysTCPath, const std::string& cryptex1AppOSPath, const std::string& cryptex1AppVOLPath, const std::string& cryptex1AppTCPath) const {
+    std::ifstream cryptex1SysOSFileStream(cryptex1SysOSPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1SysOSFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysOSPath.c_str());
+    _client->cryptex1sysosdatasize = cryptex1SysOSFileStream.tellg();
+    cryptex1SysOSFileStream.seekg(0, std::ios_base::beg);
+    std::allocator<uint8_t> alloc;
+    retassure(_client->cryptex1sysosdata = (char *)alloc.allocate(_client->cryptex1sysosdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1SysOSPath.c_str());
+    cryptex1SysOSFileStream.read((char *) _client->cryptex1sysosdata,
+                      (std::streamsize) _client->cryptex1sysosdatasize);
+    retassure(cryptex1SysOSFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysOSPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1sysosdata) != 0,
+              "%s: failed to load Cryptex1,SystemOS for %s with the size %zu!\n",
+              __func__, cryptex1SysOSPath.c_str(), _client->cryptex1sysosdatasize);
+
+    std::ifstream cryptex1SysVOLFileStream(cryptex1SysVOLPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1SysVOLFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysVOLPath.c_str());
+    _client->cryptex1sysvoldatasize = cryptex1SysVOLFileStream.tellg();
+    cryptex1SysVOLFileStream.seekg(0, std::ios_base::beg);
+    retassure(_client->cryptex1sysvoldata = (char *)alloc.allocate(_client->cryptex1sysvoldatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1SysVOLPath.c_str());
+    cryptex1SysVOLFileStream.read((char *) _client->cryptex1sysvoldata,
+                      (std::streamsize) _client->cryptex1sysvoldatasize);
+    retassure(cryptex1SysVOLFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysVOLPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1sysvoldata) != 0,
+              "%s: failed to load Cryptex1,SystemVolume for %s with the size %zu!\n",
+              __func__, cryptex1SysVOLPath.c_str(), _client->cryptex1sysvoldatasize);
+
+    std::ifstream cryptex1SysTCFileStream(cryptex1SysTCPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1SysTCFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysTCPath.c_str());
+    _client->cryptex1systcdatasize = cryptex1SysTCFileStream.tellg();
+    cryptex1SysTCFileStream.seekg(0, std::ios_base::beg);
+    retassure(_client->cryptex1systcdata = (char *)alloc.allocate(_client->cryptex1systcdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1SysTCPath.c_str());
+    cryptex1SysTCFileStream.read((char *) _client->cryptex1systcdata,
+                                 (std::streamsize) _client->cryptex1systcdatasize);
+    retassure(cryptex1SysTCFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1SysTCPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1systcdata) != 0,
+              "%s: failed to load Cryptex1,SystemTrustCache for %s with the size %zu!\n",
+              __func__, cryptex1SysTCPath.c_str(), _client->cryptex1systcdatasize);
+
+    std::ifstream cryptex1AppOSFileStream(cryptex1AppOSPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1AppOSFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppOSPath.c_str());
+    _client->cryptex1apposdatasize = cryptex1AppOSFileStream.tellg();
+    cryptex1AppOSFileStream.seekg(0, std::ios_base::beg);
+    retassure(_client->cryptex1apposdata = (char *)alloc.allocate(_client->cryptex1apposdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1AppOSPath.c_str());
+    cryptex1AppOSFileStream.read((char *) _client->cryptex1apposdata,
+                                 (std::streamsize) _client->cryptex1apposdatasize);
+    retassure(cryptex1AppOSFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppOSPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1apposdata) != 0,
+              "%s: failed to load Cryptex1,AppOS for %s with the size %zu!\n",
+              __func__, cryptex1AppOSPath.c_str(), _client->cryptex1apposdatasize);
+
+    std::ifstream cryptex1AppVOLFileStream(cryptex1AppVOLPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1AppVOLFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppVOLPath.c_str());
+    _client->cryptex1appvoldatasize = cryptex1AppVOLFileStream.tellg();
+    cryptex1AppVOLFileStream.seekg(0, std::ios_base::beg);
+    retassure(_client->cryptex1appvoldata = (char *)alloc.allocate(_client->cryptex1appvoldatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1AppVOLPath.c_str());
+    cryptex1AppVOLFileStream.read((char *) _client->cryptex1appvoldata,
+                                  (std::streamsize) _client->cryptex1appvoldatasize);
+    retassure(cryptex1AppVOLFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppVOLPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1appvoldata) != 0,
+              "%s: failed to load Cryptex1,AppVolume for %s with the size %zu!\n",
+              __func__, cryptex1AppVOLPath.c_str(), _client->cryptex1appvoldatasize);
+
+    std::ifstream cryptex1AppTCFileStream(cryptex1AppTCPath, std::ios::in | std::ios::binary | std::ios::ate);
+    retassure(cryptex1AppTCFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppTCPath.c_str());
+    _client->cryptex1apptcdatasize = cryptex1AppTCFileStream.tellg();
+    cryptex1AppTCFileStream.seekg(0, std::ios_base::beg);
+    retassure(_client->cryptex1apptcdata = (char *)alloc.allocate(_client->cryptex1apptcdatasize),
+              "%s: failed to allocate memory for %s\n", __func__, cryptex1AppTCPath.c_str());
+    cryptex1AppTCFileStream.read((char *) _client->cryptex1apptcdata,
+                                 (std::streamsize) _client->cryptex1apptcdatasize);
+    retassure(cryptex1AppTCFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, cryptex1AppTCPath.c_str());
+    retassure(*(uint64_t *) (_client->cryptex1apptcdata) != 0,
+              "%s: failed to load Cryptex1,AppTrustCache for %s with the size %zu!\n",
+              __func__, cryptex1AppTCPath.c_str(), _client->cryptex1apptcdatasize);
+}
+
+void futurerestore::loadYonkers(const std::array<std::string, 16>& yonkersPaths) const {
+    int index = 0;
+    for (const auto &yonkersPath: yonkersPaths) {
+        std::ifstream yonkersFileStream(yonkersPath, std::ios::in | std::ios::binary | std::ios::ate);
+        retassure(yonkersFileStream.good(), "%s: failed init file stream for %s!\n", __func__, yonkersPath.c_str());
+        _client->yonkersfwdatasize[index] = yonkersFileStream.tellg();
+        yonkersFileStream.seekg(0, std::ios_base::beg);
+        std::allocator<uint8_t> alloc;
+        retassure(_client->yonkersfwdata[index] = (char *)alloc.allocate(_client->yonkersfwdatasize[index]),
+                  "%s: failed to allocate memory for %s\n", __func__, yonkersPath.c_str());
+        yonkersFileStream.read((char *) _client->yonkersfwdata[index],
+        (std::streamsize) _client->yonkersfwdatasize[index]);
+        retassure(yonkersFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, yonkersPath.c_str());
+        retassure(*(uint64_t *) (_client->yonkersfwdata[index]) != 0,
+                  "%s: failed to load Yonkers for %s with the size %zu!\n",
+                  __func__, yonkersPath.c_str(), _client->yonkersfwdatasize[index]);
+        index++;
+    }
+}
+
+void futurerestore::loadRamdisk(const std::string& ramdiskPath) const {
     std::ifstream ramdiskFileStream(ramdiskPath, std::ios::in | std::ios::binary | std::ios::ate);
     retassure(ramdiskFileStream.good(), "%s: failed init file stream for %s!\n", __func__, ramdiskPath.c_str());
     _client->ramdiskdatasize = ramdiskFileStream.tellg();
@@ -2234,7 +2774,7 @@ void futurerestore::loadRamdisk(std::string ramdiskPath) {
               __func__, ramdiskPath.c_str(), _client->ramdiskdatasize);
 }
 
-void futurerestore::loadKernel(std::string kernelPath) {
+void futurerestore::loadKernel(const std::string& kernelPath) const {
     std::ifstream kernelFileStream(kernelPath, std::ios::in | std::ios::binary | std::ios::ate);
     retassure(kernelFileStream.good(), "%s: failed init file stream for %s!\n", __func__, kernelPath.c_str());
     _client->kerneldatasize = kernelFileStream.tellg();
@@ -2250,7 +2790,7 @@ void futurerestore::loadKernel(std::string kernelPath) {
               __func__, kernelPath.c_str(), _client->kerneldatasize);
 }
 
-void futurerestore::loadSep(std::string sepPath) {
+void futurerestore::loadSep(const std::string& sepPath) const {
     std::ifstream sepFileStream(sepPath, std::ios::binary | std::ios::in | std::ios::ate);
     retassure(sepFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sepPath.c_str());
     _client->sepfwdatasize = sepFileStream.tellg();
@@ -2266,7 +2806,7 @@ void futurerestore::loadSep(std::string sepPath) {
               __func__, sepPath.c_str(), _client->sepfwdatasize);
 }
 
-void futurerestore::loadBaseband(std::string basebandPath) {
+void futurerestore::loadBaseband(const std::string& basebandPath) {
     std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in);
     retassure(basebandFileStream.good(), "%s: failed init file stream for %s!\n", __func__, basebandPath.c_str());
     uint64_t *basebandFront = nullptr;
@@ -2279,7 +2819,7 @@ void futurerestore::loadBaseband(std::string basebandPath) {
               __func__, basebandPath.c_str());
 }
 
-char *futurerestore::readBaseband(std::string basebandPath, char *data, size_t *sz) {
+char *futurerestore::readBaseband(const std::string& basebandPath, char *data, size_t *sz) {
     std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in | std::ios::ate);
     if(!basebandFileStream.good()) {
         return nullptr;
@@ -2700,4 +3240,16 @@ const char *futurerestore::extractZipFileToString(char *zip_buffer, const char *
         }
     }
     return (const char *)target_buffer;
+}
+
+bool futurerestore::is32bit() {
+    bool ret = !is_image4_supported(_client);
+    if(_client) {
+        dfu_client_free(_client);
+    }
+    if(_client) {
+        recovery_client_free(_client);
+    }
+    getDeviceMode(true);
+    return ret;
 }

@@ -49,7 +49,7 @@ public:
 };
 
 class futurerestore {
-    struct idevicerestore_client_t* _client;
+//    struct idevicerestore_client_t* _client;
     char *_ibootBuild = nullptr;
     bool _didInit = false;
     std::vector<plist_t> _aptickets;
@@ -113,6 +113,8 @@ class futurerestore {
     void enterPwnRecovery(plist_t build_identity, std::string bootargs);
 
 public:
+    void test() const;
+    struct idevicerestore_client_t* _client;
     futurerestore(bool isUpdateInstall = false, bool isPwnDfu = false, bool noIBSS = false, bool setNonce = false, bool serial = false, bool noRestore = false, bool noRSEP = false);
     bool init();
     int getDeviceMode(bool reRequest);
@@ -144,22 +146,30 @@ public:
     void downloadLatestSE();
     void downloadLatestSavage();
     void downloadLatestVeridian();
+    void downloadLatestTimer();
+    void downloadLatestBaobab();
+    void downloadLatestCryptex1();
+    void downloadLatestYonkers();
     void downloadLatestFirmwareComponents();
     void downloadLatestBaseband();
     void downloadLatestSep();
     
-    void loadSepManifest(std::string sepManifestPath);
-    void loadBasebandManifest(std::string basebandManifestPath);
-    void loadRose(std::string rosePath);
-    void loadSE(std::string sePath);
-    void loadSavage(std::array<std::string, 6> savagePaths);
-    void loadVeridian(std::string veridianDGMPath, std::string veridianFWMPath);
-    void loadRamdisk(std::string ramdiskPath);
-    void loadKernel(std::string kernelPath);
-    void loadSep(std::string sepPath);
-    void loadBaseband(std::string basebandPath);
-    char *readBaseband(std::string basebandPath, char *data, size_t *sz);
-    unsigned char *getSHABuffer(char *data, size_t dataSize, int type = 0);
+    void loadSepManifest(const std::string& sepManifestPath);
+    void loadBasebandManifest(const std::string& basebandManifestPath);
+    void loadRose(const std::string& rosePath) const;
+    void loadSE(const std::string& sePath) const;
+    void loadSavage(const std::array<std::string, 6>& savagePaths) const;
+    void loadVeridian(const std::string& veridianDGMPath, std::string veridianFWMPath) const;
+    void loadTimer(const std::string& timerPath) const;
+    void loadBaobab(const std::string& baobabPath) const;
+    void loadCryptex1(const std::string& cryptex1SysOSPath, const std::string& cryptex1SysVOLPath, const std::string& cryptex1SysTCPath, const std::string& cryptex1AppOSPath, const std::string& cryptex1AppVOLPath, const std::string& cryptex1AppTCPath) const;
+    void loadYonkers(const std::array<std::string, 16>& yonkersPaths) const;
+    void loadRamdisk(const std::string& ramdiskPath) const;
+    void loadKernel(const std::string& kernelPath) const;
+    void loadSep(const std::string& sepPath) const;
+    static void loadBaseband(const std::string& basebandPath);
+    static char *readBaseband(const std::string& basebandPath, char *data, size_t *sz);
+    static unsigned char *getSHABuffer(char *data, size_t dataSize, int type = 0);
     unsigned char *getSHA(const std::string& filePath, int type = 0);
 
     void setCustomLatest(std::string version){_customLatest = version; _useCustomLatest = true;}
@@ -175,8 +185,8 @@ public:
     void disableCache(){_noCache = true;};
     void skipBlobValidation(){_skipBlob = true;};
 
-    bool is32bit(){return !is_image4_supported(_client);};
-    
+    bool is32bit();
+
     uint64_t getBasebandGoldCertIDFromDevice();
     
     void doRestore(const char *ipsw);
