@@ -1577,7 +1577,7 @@ void futurerestore::loadFirmwareTokens() {
     }
     if(!_betaFirmwareTokens && _useCustomLatestBeta) {
         if (!_betaFirmwareJson) _betaFirmwareJson = getBetaFirmwareJson(getDeviceModelNoCopy());
-        if(!_betaFirmwareJson) {
+        if(!_betaFirmwareJson || strcmp(_betaFirmwareJson, "[]") == 0) {
             info("[TSSC] Could not get betas json, falling back to appledb\n");
             _useAppleDB = true;
             std::string type("iOS");
