@@ -11,6 +11,7 @@
 
 extern "C"{
 #include "tsschecker.h"
+extern void restore_set_ignore_bb_fail(int input);
 };
 
 #include <libgeneral/macros.h>
@@ -80,6 +81,7 @@ static struct option longopts[] = {
 #define FLAG_CUSTOM_LATEST_BETA     1 << 17
 #define FLAG_CUSTOM_LATEST_OTA      1 << 18
 #define FLAG_NO_RSEP_FR             1 << 19
+#define FLAG_IGNORE_BB_FAIL         1 << 20
 
 bool manual = false;
 
@@ -421,6 +423,9 @@ int main_r(int argc, const char * argv[]) {
                 client.loadSep(sepPath);
                 client.loadSepManifest(sepManifestPath);
             }
+        }
+        if(flags & FLAG_IGNORE_BB_FAIL) {
+            restore_set_ignore_bb_fail(1);
         }
 
         versVals.basebandMode = kBasebandModeWithoutBaseband;
