@@ -13,7 +13,7 @@ target_include_directories(futurerestore PRIVATE
         "${CMAKE_SOURCE_DIR}/external/tsschecker/external/jssy/jssy"
         "${CMAKE_SOURCE_DIR}/external/tsschecker/tsschecker")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
-if(NOT DEFINED NO_PKGCFG AND NOT "$ENV{NO_PKGCFG}" MATCHES "1")
+if(NOT NO_PKGCFG AND NOT "$ENV{NO_PKGCFG}" MATCHES "1")
     pkg_check_modules(DEPS REQUIRED
             libzip
             zlib
