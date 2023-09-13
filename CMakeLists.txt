@@ -12,6 +12,8 @@ if(ARCH STREQUAL "")
 endif()
 
 if("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Darwin")
+    set(CMAKE_OSX_ARCHITECTURES "${ARCH}")
+    message("1337: CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
     if((NOT DEFINED MINVER) AND NO_PKGCFG)
         if("${ARCH}" STREQUAL "x86_64")
             set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
@@ -34,7 +36,6 @@ elseif("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "MSYS" OR "${CMAKE_HOST_SYSTEM_NAME}"
     set(PROJECT_C_FLAGS "-arch ${ARCH} -Wl,--allow-multiple-definition -pthread -fPIC -Wno-deprecated-declarations -Wno-int-conversion -DCURL_STATICLIB -Bstatic -O0")
     set(PROJECT_CXX_FLAGS "${PROJECT_C_FLAGS}")
 endif()
-
 if(ASAN)
     set(ASAN ON)
     set(ASAN_FLAGS "-fsanitize=address -fsanitize-address-use-after-scope -fno-omit-frame-pointer ${ASAN_FLAGS}")
