@@ -2409,8 +2409,6 @@ void futurerestore::downloadLatestCryptex1() {
         safeFree(cryptex1SysOSDGSTStr);
         safeFree(cryptex1SysOSHash);
     } else {
-        info("cryptex1SysOSHash: %s\n", cryptex1SysOSHash);
-        info("cryptex1SysOSDGSTStr: %s\n", cryptex1SysOSDGSTStr);
         if (cryptex1SysOSStr) {
             if (_useCustomLatestOTA) {
                 snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysOSStr);
