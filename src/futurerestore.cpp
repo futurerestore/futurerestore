@@ -2358,72 +2358,147 @@ void futurerestore::downloadLatestYonkers() {
 
 void futurerestore::downloadLatestCryptex1() {
     char *manifeststr = getLatestManifest();
-    char *cryptex1SysOSStr = (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
-    char *cryptex1SysVOLStr = (elemExists("Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
-    char *cryptex1SysTCStr = (elemExists("Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
-    char *cryptex1AppOSStr = (elemExists("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
-    char *cryptex1AppVOLStr = (elemExists("Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
-    char *cryptex1AppTCStr = (elemExists("Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), 0) ? getPathOfElementInManifest(
-            "Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    char *cryptex1SysOSStr = (elemExists("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), 0)
+                              ? getPathOfElementInManifest(
+                    "Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1SysOSDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemOS", manifeststr, getDeviceBoardNoCopy(),
+                                                              _useCustomLatestOTA);
+    info("Checking for cached Cryptex1...\n");
+    auto *cryptex1SysOSHash = getSHA(cryptex1SysOSTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
+    char *cryptex1SysVOLStr = (elemExists("Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), 0)
+                               ? getPathOfElementInManifest(
+                    "Cryptex1,SystemVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1SysVOLDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemVolume", manifeststr,
+                                                               getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *cryptex1SysVOLHash = getSHA(cryptex1SysVOLTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
+    char *cryptex1SysTCStr = (elemExists("Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), 0)
+                              ? getPathOfElementInManifest(
+                    "Cryptex1,SystemTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1SysTCDGSTStr = getDigestOfElementInManifest("Cryptex1,SystemTrustCache", manifeststr,
+                                                              getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *cryptex1SysTCHash = getSHA(cryptex1SysTCTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
+    char *cryptex1AppOSStr = (elemExists("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), 0)
+                              ? getPathOfElementInManifest(
+                    "Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1AppOSDGSTStr = getDigestOfElementInManifest("Cryptex1,AppOS", manifeststr, getDeviceBoardNoCopy(),
+                                                              _useCustomLatestOTA);
+    auto *cryptex1AppOSHash = getSHA(cryptex1AppOSTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
+    char *cryptex1AppVOLStr = (elemExists("Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), 0)
+                               ? getPathOfElementInManifest(
+                    "Cryptex1,AppVolume", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1AppVOLDGSTStr = getDigestOfElementInManifest("Cryptex1,AppVolume", manifeststr,
+                                                               getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *cryptex1AppVOLHash = getSHA(cryptex1AppVOLTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
+
+    char *cryptex1AppTCStr = (elemExists("Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), 0)
+                              ? getPathOfElementInManifest(
+                    "Cryptex1,AppTrustCache", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA) : nullptr);
+    auto *cryptex1AppTCDGSTStr = getDigestOfElementInManifest("Cryptex1,AppTrustCache", manifeststr,
+                                                              getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *cryptex1AppTCHash = getSHA(cryptex1AppTCTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
+
     char otaString[1024]{};
-    if (cryptex1SysOSStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysOSStr);
-            cryptex1SysOSStr = reinterpret_cast<char *>(&otaString);
+    if (cryptex1SysOSHash && cryptex1SysOSDGSTStr &&
+        !memcmp(cryptex1SysOSDGSTStr, cryptex1SysOSHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,SystemOS.\n");
+        safeFree(cryptex1SysOSDGSTStr);
+        safeFree(cryptex1SysOSHash);
+    } else {
+        info("cryptex1SysOSHash: %s\n", cryptex1SysOSHash);
+        info("cryptex1SysOSDGSTStr: %s\n", cryptex1SysOSDGSTStr);
+        if (cryptex1SysOSStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysOSStr);
+                cryptex1SysOSStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,SystemOS dmg(this may take a while)\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysOSStr, cryptex1SysOSTempPath.c_str()),
+                      "Could not download Cryptex1,SystemOS\n");
         }
-        info("Downloading Cryptex1,SystemOS dmg(this may take a while)\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysOSStr, cryptex1SysOSTempPath.c_str()),
-                  "Could not download Cryptex1,SystemOS\n");
     }
-    if (cryptex1SysVOLStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysVOLStr);
-            cryptex1SysVOLStr = reinterpret_cast<char *>(&otaString);
+    if (cryptex1SysVOLHash && cryptex1SysVOLDGSTStr &&
+        !memcmp(cryptex1SysVOLDGSTStr, cryptex1SysVOLHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,SystemVolume.\n");
+        safeFree(cryptex1SysVOLDGSTStr);
+        safeFree(cryptex1SysVOLHash);
+    } else {
+        if (cryptex1SysVOLStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysVOLStr);
+                cryptex1SysVOLStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,SystemVolume root_hash\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysVOLStr, cryptex1SysVOLTempPath.c_str()),
+                      "Could not download Cryptex1,SystemVolume\n");
         }
-        info("Downloading Cryptex1,SystemVolume root_hash\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysVOLStr, cryptex1SysVOLTempPath.c_str()),
-                  "Could not download Cryptex1,SystemVolume\n");
     }
-    if (cryptex1SysTCStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysTCStr);
-            cryptex1SysTCStr = reinterpret_cast<char *>(&otaString);
+    if (cryptex1SysTCHash && cryptex1SysTCDGSTStr &&
+        !memcmp(cryptex1SysTCDGSTStr, cryptex1SysTCHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,SystemTrustCache.\n");
+        safeFree(cryptex1SysTCDGSTStr);
+        safeFree(cryptex1SysTCHash);
+    } else {
+        if (cryptex1SysTCStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1SysTCStr);
+                cryptex1SysTCStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,SystemTrustCache\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysTCStr, cryptex1SysTCTempPath.c_str()),
+                      "Could not download Cryptex1,SystemTrustCache\n");
         }
-        info("Downloading Cryptex1,SystemTrustCache\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1SysTCStr, cryptex1SysTCTempPath.c_str()),
-                  "Could not download Cryptex1,SystemTrustCache\n");
     }
-    if (cryptex1AppOSStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppOSStr);
-            cryptex1AppOSStr = reinterpret_cast<char *>(&otaString);
+    if (cryptex1AppOSHash && cryptex1AppOSDGSTStr &&
+        !memcmp(cryptex1AppOSDGSTStr, cryptex1AppOSHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,AppOS.\n");
+        safeFree(cryptex1AppOSDGSTStr);
+        safeFree(cryptex1AppOSHash);
+    } else {
+        if (cryptex1AppOSStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppOSStr);
+                cryptex1AppOSStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,AppOS dmg\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppOSStr, cryptex1AppOSTempPath.c_str()),
+                      "Could not download Cryptex1,AppOS\n");
         }
-        info("Downloading Cryptex1,AppOS dmg\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppOSStr, cryptex1AppOSTempPath.c_str()),
-                  "Could not download Cryptex1,AppOS\n");
     }
-    if (cryptex1AppVOLStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppVOLStr);
-            cryptex1AppVOLStr = reinterpret_cast<char *>(&otaString);
+    if (cryptex1AppVOLHash && cryptex1AppVOLDGSTStr &&
+        !memcmp(cryptex1AppVOLDGSTStr, cryptex1AppVOLHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,AppVolume.\n");
+        safeFree(cryptex1AppVOLDGSTStr);
+        safeFree(cryptex1AppVOLHash);
+    } else {
+        if (cryptex1AppVOLStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppVOLStr);
+                cryptex1AppVOLStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,AppVolume root_hash\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppVOLStr, cryptex1AppVOLTempPath.c_str()),
+                      "Could not download Cryptex1,AppVolume\n");
         }
-        info("Downloading Cryptex1,AppVolume root_hash\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppVOLStr, cryptex1AppVOLTempPath.c_str()),
-                  "Could not download Cryptex1,AppVolume\n");
     }
-    if (cryptex1AppTCStr) {
-        if(_useCustomLatestOTA) {
-            snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppTCStr);
-            cryptex1AppTCStr = reinterpret_cast<char *>(&otaString);
+    if(cryptex1AppTCHash && cryptex1AppTCDGSTStr && !memcmp(cryptex1AppTCDGSTStr, cryptex1AppTCHash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
+        info("Using cached Cryptex1,AppTrustCache.\n");
+        safeFree(cryptex1AppTCDGSTStr);
+        safeFree(cryptex1AppTCHash);
+    } else {
+        if (cryptex1AppTCStr) {
+            if (_useCustomLatestOTA) {
+                snprintf(otaString, 1024, "%s%s", "AssetData/boot/", cryptex1AppTCStr);
+                cryptex1AppTCStr = reinterpret_cast<char *>(&otaString);
+            }
+            info("Downloading Cryptex1,AppTrustCache\n\n");
+            retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppTCStr, cryptex1AppTCTempPath.c_str()),
+                      "Could not download Cryptex1,AppTrustCache\n");
         }
-        info("Downloading Cryptex1,AppTrustCache\n\n");
-        retassure(!downloadPartialzip(getLatestFirmwareUrl(), cryptex1AppTCStr, cryptex1AppTCTempPath.c_str()),
-                  "Could not download Cryptex1,AppTrustCache\n");
     }
     loadCryptex1(cryptex1SysOSTempPath, cryptex1SysVOLTempPath, cryptex1SysTCTempPath, cryptex1AppOSTempPath, cryptex1AppVOLTempPath, cryptex1AppTCTempPath);
 }
