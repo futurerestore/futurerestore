@@ -822,9 +822,10 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBEC.first,
                                     (unsigned long) iBEC.second, 1);
             retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBEC", irecv_strerror(err));
-            retassure(((irecv_send_command(_client->dfu->client, "go") == IRECV_E_SUCCESS) ||
+            retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not disconnect/reconnect. Possibly invalid iBEC. Reset device and try again\n");
+            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, 0, 0, 5000);
 
             info("Booting iBEC, waiting for device to disconnect...\n");
             cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);
@@ -857,9 +858,10 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             err = irecv_send_buffer(_client->dfu->client, (unsigned char *) (char *) iBEC.first,
                                     (unsigned long) iBEC.second, 1);
             retassure(err == IRECV_E_SUCCESS, "ERROR: Unable to send %s component: %s\n", "iBEC", irecv_strerror(err));
-            retassure(((irecv_send_command(_client->dfu->client, "go") == IRECV_E_SUCCESS) ||
+            retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not disconnect/reconnect. Possibly invalid iBEC. Reset device and try again\n");
+            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, 0, 0, 5000);
 
             info("Booting iBEC, waiting for device to disconnect...\n");
             cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);

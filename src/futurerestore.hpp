@@ -16,15 +16,15 @@
 #endif
 #endif
 
-#include <stdio.h>
+#include <cstdio>
 #include <functional>
 #include <vector>
 #include <array>
 #include <string>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <errno.h>
-#include <string.h>
+#include <cerrno>
+#include <cstring>
 #include <zip.h>
 #include "idevicerestore.h"
 #include <jssy.h>
