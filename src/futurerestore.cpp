@@ -48,11 +48,10 @@ void safe_mkdir(const char *path, int mode) {
 #ifdef __APPLE__
     newID = 501;
 #else
-    std::ifstream osReleaseStream(std::string("/etc/os-release"), std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream osReleaseStream(std::string("/etc/os-release"), std::ios::in | std::ios::binary);
     std::string osRelease;
     if(osReleaseStream.good()) {
-        osRelease.reserve(osReleaseStream.tellg());
-        osReleaseStream.seekg(std::ifstream::beg);
+        osRelease.reserve(futurerestore::getFileSize(std::string("/etc/os-release")));
         osRelease.assign((std::istreambuf_iterator<char>(osReleaseStream)), std::istreambuf_iterator<char>());
         if ((osReleaseStream.good())) {
             int pos = osRelease.find(std::string("\nID="));
@@ -120,9 +119,24 @@ std::string sepManifestTempPath = futurerestoreTempPath + "/sepManifest.plist";
 #   include <CommonCrypto/CommonDigest.h>
 
 #   define SHA1(d, n, md) CC_SHA1(d, n, md)
+#   define SHA_CTX CC_SHA1_CTX
+#   define SHA1_Init(c) CC_SHA1_Init(c)
+#   define SHA1_Final(md, c) CC_SHA1_Final(md, c)
+#   define SHA1_Update(c, d, l) CC_SHA1_Update(c, d, l)
 #   define SHA256(d, n, md) CC_SHA256(d, n, md)
+#   define SHA256_CTX CC_SHA256_CTX
+#   define SHA256_Init(c) CC_SHA256_Init(c)
+#   define SHA256_Final(md, c) CC_SHA256_Final(md, c)
+#   define SHA256_Update(c, d, l) CC_SHA256_Update(c, d, l)
 #   define SHA384(d, n, md) CC_SHA384(d, n, md)
+#   define SHA384_Init(c) CC_SHA384_Init(c)
+#   define SHA384_Final(md, c) CC_SHA384_Final(md, c)
+#   define SHA384_Update(c, d, l) CC_SHA384_Update(c, d, l)
 #   define SHA512(d, n, md) CC_SHA512(d, n, md)
+#   define SHA512_CTX CC_SHA512_CTX
+#   define SHA512_Init(c) CC_SHA512_Init(c)
+#   define SHA512_Final(md, c) CC_SHA512_Final(md, c)
+#   define SHA512_Update(c, d, l) CC_SHA512_Update(c, d, l)
 #else
 #   include <openssl/sha.h>
 extern "C" {
@@ -150,11 +164,19 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
                                                _setNonce(setNonce), _serial(serial), _noRestore(noRestore), _noRSEP(noRSEP) {
     _client = idevicerestore_client_new();
     retassure(_client != nullptr, "Could not create idevicerestore client\n");
+#ifdef WIN32
+    struct _stat64 st{0};
+#else
     struct stat st{0};
+#endif
     char *tmpdir = std::getenv("TMPDIR");
     if(tmpdir != nullptr ) {
         std::string TMPDIR(tmpdir);
+#ifdef WIN32
+        if(!TMPDIR.empty() && _stat64(tmpdir, &st) > -1) {
+#else
         if(!TMPDIR.empty() && stat(tmpdir, &st) > -1) {
+#endif
             futurerestoreTempPath = TMPDIR +"/futurerestore";
             roseTempPath = futurerestoreTempPath + "/rose.bin";
             seTempPath = futurerestoreTempPath + "/se.sefw";
@@ -174,7 +196,11 @@ futurerestore::futurerestore(bool isUpdateInstall, bool isPwnDfu, bool noIBSS, b
             sepManifestTempPath = futurerestoreTempPath + "/sepManifest.plist";
         }
     }
+#ifdef WIN32
+    if (_stat64(futurerestoreTempPath.c_str(), &st) == -1) safe_mkdir(futurerestoreTempPath.c_str(), 0755);
+#else
     if (stat(futurerestoreTempPath.c_str(), &st) == -1) safe_mkdir(futurerestoreTempPath.c_str(), 0755);
+#endif
 
 // TODO: implement windows CI and enable update check
 #ifndef WIN32
@@ -213,12 +239,12 @@ bool futurerestore::init() {
     return _didInit;
 }
 
-uint64_t futurerestore::getDeviceEcid() {
+uint64_t futurerestore::getDeviceEcid() const {
     retassure(_didInit, "did not init\n");
     return _client->ecid;
 }
 
-int futurerestore::getDeviceMode(bool reRequest) {
+int futurerestore::getDeviceMode(bool reRequest) const {
     retassure(_didInit, "did not init\n");
     if (!reRequest && _client->mode && _client->mode->index != _MODE_UNKNOWN) {
         return _client->mode->index;
@@ -270,7 +296,7 @@ void futurerestore::putDeviceIntoRecovery() {
     recovery_client_free(_client);
 }
 
-void futurerestore::setAutoboot(bool val) {
+void futurerestore::setAutoboot(bool val) const {
     retassure(_didInit, "did not init\n");
 
     retassure(getDeviceMode(false) == _MODE_RECOVERY, "can't set auto-boot, when device isn't in recovery mode\n");
@@ -280,7 +306,7 @@ void futurerestore::setAutoboot(bool val) {
     retassure(!recovery_set_autoboot(_client, val), "Setting auto-boot failed?!\n");
 }
 
-void futurerestore::exitRecovery() {
+void futurerestore::exitRecovery() const {
     setAutoboot(true);
     recovery_send_reset(_client);
     recovery_client_free(_client);
@@ -447,9 +473,16 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
     for (auto apticketPath: apticketPaths) {
         plist_t apticket = nullptr;
         char *im4m = nullptr;
+#ifdef WIN32
+        struct _stat64 fst{};
+#else
         struct stat fst{};
-
+#endif
+#ifdef WIN32
+        retassure(!_stat64(apticketPath, &fst), "failed to load APTicket at %s\n", apticketPath);
+#else
         retassure(!stat(apticketPath, &fst), "failed to load APTicket at %s\n", apticketPath);
+#endif
 
         gzFile zf = gzopen(apticketPath, "rb");
         if (zf) {
@@ -510,7 +543,7 @@ void futurerestore::loadAPTickets(const std::vector<const char *> &apticketPaths
     }
 }
 
-uint64_t futurerestore::getBasebandGoldCertIDFromDevice() {
+uint64_t futurerestore::getBasebandGoldCertIDFromDevice() const {
     if (!_client->preflight_info) {
         if (normal_get_preflight_info(_client, &_client->preflight_info) == -1) {
             printf("[WARNING] failed to read BasebandGoldCertID from device! Is it already in recovery?\n");
@@ -661,12 +694,12 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
     if (!iBSS.first && !_noIBSS) {
         info("Patching iBSS\n");
         iBSS = getIPSWComponent(_client, build_identity, "iBSS");
-        iBSS = move(libipatcher::patchiBSS((char *) iBSS.first, iBSS.second, iBSSKeys));
+        iBSS = std::move(libipatcher::patchiBSS((char *) iBSS.first, iBSS.second, iBSSKeys));
     }
     if (!iBEC.first) {
         info("Patching iBEC\n");
         iBEC = getIPSWComponent(_client, build_identity, "iBEC");
-        iBEC = move(libipatcher::patchiBEC((char *) iBEC.first, iBEC.second, iBECKeys, std::move(bootargs)));
+        iBEC = std::move(libipatcher::patchiBEC((char *) iBEC.first, iBEC.second, iBECKeys, std::move(bootargs)));
     }
 
     if (_client->image4supported) {
@@ -674,11 +707,11 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
            also due to the nature of iBoot64Patchers sigpatches we need to stich a valid signed im4m to it (but nonce is ignored) */
         if (!cache1 && !_noIBSS) {
             info("Repacking patched iBSS as IMG4\n");
-            iBSS = move(libipatcher::packIM4PToIMG4(iBSS.first, iBSS.second, _im4ms[0].first, _im4ms[0].second));
+            iBSS = std::move(libipatcher::packIM4PToIMG4(iBSS.first, iBSS.second, _im4ms[0].first, _im4ms[0].second));
         }
         if (!cache2) {
             info("Repacking patched iBEC as IMG4\n");
-            iBEC = move(libipatcher::packIM4PToIMG4(iBEC.first, iBEC.second, _im4ms[0].first, _im4ms[0].second));
+            iBEC = std::move(libipatcher::packIM4PToIMG4(iBEC.first, iBEC.second, _im4ms[0].first, _im4ms[0].second));
         }
     }
 
@@ -825,7 +858,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not disconnect/reconnect. Possibly invalid iBEC. Reset device and try again\n");
-            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, 0, 0, 5000);
+            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, nullptr, 0, 5000);
 
             info("Booting iBEC, waiting for device to disconnect...\n");
             cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);
@@ -861,7 +894,7 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
             retassure(((irecv_send_command_breq(_client->dfu->client, "go", 1) == IRECV_E_SUCCESS) ||
                        (mutex_unlock(&_client->device_event_mutex), 0)),
                       "Device did not disconnect/reconnect. Possibly invalid iBEC. Reset device and try again\n");
-            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, 0, 0, 5000);
+            irecv_usb_control_transfer(_client->dfu->client, 0x21, 1, 0, 0, nullptr, 0, 5000);
 
             info("Booting iBEC, waiting for device to disconnect...\n");
             cond_wait_timeout(&_client->device_event_cond, &_client->device_event_mutex, 10000);
@@ -920,7 +953,7 @@ void get_custom_component(struct idevicerestore_client_t *client, plist_t build_
 #else
     try {
         auto comp = getIPSWComponent(client, build_identity, component);
-        comp = move(libipatcher::decryptFile3((char *) comp.first, comp.second,
+        comp = std::move(libipatcher::decryptFile3((char *) comp.first, comp.second,
                                               libipatcher::getFirmwareKey(client->device->product_type, client->build,
                                                                           component)));
         *data = (unsigned char *) (char *) comp.first;
@@ -1230,11 +1263,20 @@ void futurerestore::doRestore(const char *ipsw) {
               "ERROR: Unable to get path for filesystem component\n");
 
     // check if we already have an extracted filesystem
+#ifdef WIN32
+    struct _stat64 st{};
+    memset(&st, '\0', sizeof(struct _stat64));
+#else
     struct stat st{};
     memset(&st, '\0', sizeof(struct stat));
+#endif
     char tmpf[1024];
     if (client->cache_dir) {
+#ifdef WIN32
+        if (_stat64(client->cache_dir, &st) < 0) {
+#else
         if (stat(client->cache_dir, &st) < 0) {
+#endif
             mkdir_with_parents(client->cache_dir, 0755);
         }
         strcpy(tmpf, client->cache_dir);
@@ -1249,15 +1291,23 @@ void futurerestore::doRestore(const char *ipsw) {
     if (p) {
         *p = '\0';
     }
-
+#ifdef WIN32
+    if (_stat64(tmpf, &st) < 0) {
+#else
     if (stat(tmpf, &st) < 0) {
+#endif
         safe_mkdir(tmpf, 0755);
     }
     strcat(tmpf, "/");
     strcat(tmpf, fsname);
 
+#ifdef WIN32
+    memset(&st, '\0', sizeof(struct _stat64));
+    if (_stat64(tmpf, &st) == 0) {
+#else
     memset(&st, '\0', sizeof(struct stat));
     if (stat(tmpf, &st) == 0) {
+#endif
         off_t fssize = 0;
         ipsw_get_file_size(client->ipsw, fsname, (uint64_t *) &fssize);
         if ((fssize > 0) && (st.st_size == fssize)) {
@@ -1482,7 +1532,7 @@ int futurerestore::findProc(const char *procName, bool load) {
         procs = procs2;
         ctlRet = sysctl(mib, mibLen, procs, &size, nullptr, 0);
     } while(ctlRet < 0 && errno == ENOMEM);
-    int nprocs = size / sizeof(struct kinfo_proc);
+    size_t nprocs = size / sizeof(struct kinfo_proc);
     int pid = 0;
     char *cmd;
     for(int i = 0; i < nprocs; i++) {
@@ -1554,7 +1604,7 @@ void futurerestore::daemonManager(bool load) {
         debug("daemonManager: suspending invasive macOS daemons...\n");
     }
     int pid = 0;
-    const char *procList[] = { "MobileDeviceUpdater", "AMPDevicesAgent", "AMPDeviceDiscoveryAgent", 0};
+    const char *procList[] = { "Spotify", "MobileDeviceUpdater", "AMPDevicesAgent", "AMPDeviceDiscoveryAgent", nullptr};
     for(int i = 0; i < 3; i++) {
         pid = findProc(procList[i], load);
         if (pid > 1) {
@@ -2533,10 +2583,10 @@ void futurerestore::downloadLatestFirmwareComponents() {
 }
 
 void futurerestore::downloadLatestBaseband() {
-    auto manifeststr = getLatestManifest();
+    auto manifeststr = std::string(getLatestManifest());
     saveStringToFile(manifeststr, basebandManifestTempPath);
-    auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr, getDeviceBoardNoCopy(), _useCustomLatestOTA);
-    auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr, getDeviceBoardNoCopy(), 0);
+    auto pathStr = getPathOfElementInManifest("BasebandFirmware", manifeststr.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *bbcfgDigestString = getBBCFGDigestInManifest(manifeststr.c_str(), getDeviceBoardNoCopy(), 0);
     size_t basebandSize = 0;
     char *basebandData = nullptr;
     basebandData = readBaseband(basebandTempPath, basebandData, &basebandSize);
@@ -2570,10 +2620,10 @@ void futurerestore::downloadLatestBaseband() {
 }
 
 void futurerestore::downloadLatestSep() {
-    auto manifestString = getLatestManifest();
+    auto manifestString = std::string(getLatestManifest());
     saveStringToFile(manifestString, sepManifestTempPath);
-    auto pathString = getPathOfElementInManifest("SEP", manifestString, getDeviceBoardNoCopy(), _useCustomLatestOTA);
-    auto *digestString = getDigestOfElementInManifest("SEP",manifestString,getDeviceBoardNoCopy(),_useCustomLatestOTA);
+    auto pathString = getPathOfElementInManifest("SEP", manifestString.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
+    auto *digestString = getDigestOfElementInManifest("SEP",manifestString.c_str(), getDeviceBoardNoCopy(), _useCustomLatestOTA);
     auto *hash = getSHA(sepTempPath, ((_client->device->chip_id < 0x8010) ? 3 : 0));
     if(hash && digestString && !memcmp(digestString, hash, ((_client->device->chip_id < 0x8010) ? 20 : 48))) {
         info("Using cached SEP.\n");
@@ -2609,10 +2659,9 @@ void futurerestore::loadBasebandManifest(const std::string& basebandManifestPath
 };
 
 void futurerestore::loadRose(const std::string& rosePath) const {
-    std::ifstream roseFileStream(rosePath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream roseFileStream(rosePath, std::ios::in | std::ios::binary);
     retassure(roseFileStream.good(), "%s: failed init file stream for %s!\n", __func__, rosePath.c_str());
-    _client->rosefwdatasize = roseFileStream.tellg();
-    roseFileStream.seekg(0, std::ios_base::beg);
+    _client->rosefwdatasize = futurerestore::getFileSize(rosePath);
     std::allocator<uint8_t> alloc;
     retassure(_client->rosefwdata = (char *)alloc.allocate(_client->rosefwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, rosePath.c_str());
@@ -2625,10 +2674,9 @@ void futurerestore::loadRose(const std::string& rosePath) const {
 }
 
 void futurerestore::loadSE(const std::string& sePath) const {
-    std::ifstream seFileStream(sePath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream seFileStream(sePath, std::ios::in | std::ios::binary);
     retassure(seFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sePath.c_str());
-    _client->sefwdatasize = seFileStream.tellg();
-    seFileStream.seekg(0, std::ios_base::beg);
+    _client->sefwdatasize = futurerestore::getFileSize(sePath);
     std::allocator<uint8_t> alloc;
     retassure(_client->sefwdata = (char *)alloc.allocate(_client->sefwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, sePath.c_str());
@@ -2643,10 +2691,9 @@ void futurerestore::loadSE(const std::string& sePath) const {
 void futurerestore::loadSavage(const std::array<std::string, 6>& savagePaths) const {
     int index = 0;
     for (const auto &savagePath: savagePaths) {
-        std::ifstream savageFileStream(savagePath, std::ios::in | std::ios::binary | std::ios::ate);
+        std::ifstream savageFileStream(savagePath, std::ios::in | std::ios::binary);
         retassure(savageFileStream.good(), "%s: failed init file stream for %s!\n", __func__, savagePath.c_str());
-        _client->savagefwdatasize[index] = savageFileStream.tellg();
-        savageFileStream.seekg(0, std::ios_base::beg);
+        _client->savagefwdatasize[index] = futurerestore::getFileSize(savagePath);
         std::allocator<uint8_t> alloc;
         retassure(_client->savagefwdata[index] = (char *)alloc.allocate(_client->savagefwdatasize[index]),
                   "%s: failed to allocate memory for %s\n", __func__, savagePath.c_str());
@@ -2660,14 +2707,13 @@ void futurerestore::loadSavage(const std::array<std::string, 6>& savagePaths) co
     }
 }
 
-void futurerestore::loadVeridian(const std::string& veridianDGMPath, std::string veridianFWMPath) const {
-    std::ifstream veridianDGMFileStream(veridianDGMPath, std::ios::in | std::ios::binary | std::ios::ate);
-    std::ifstream veridianFWMFileStream(veridianFWMPath, std::ios::in | std::ios::binary | std::ios::ate);
+void futurerestore::loadVeridian(const std::string& veridianDGMPath, const std::string& veridianFWMPath) const {
+    std::ifstream veridianDGMFileStream(veridianDGMPath, std::ios::in | std::ios::binary);
+    std::ifstream veridianFWMFileStream(veridianFWMPath, std::ios::in | std::ios::binary);
     retassure(veridianDGMFileStream.good(), "%s: failed init file stream for %s!\n", __func__, veridianDGMPath.c_str());
     retassure(veridianFWMFileStream.good(), "%s: failed init file stream for %s!\n", __func__,
               veridianFWMPath.c_str());
-    _client->veridiandgmfwdatasize = veridianDGMFileStream.tellg();
-    veridianDGMFileStream.seekg(0, std::ios_base::beg);
+    _client->veridiandgmfwdatasize = futurerestore::getFileSize(veridianDGMPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->veridiandgmfwdata = (char *)alloc.allocate(_client->veridiandgmfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, veridianDGMPath.c_str());
@@ -2677,9 +2723,7 @@ void futurerestore::loadVeridian(const std::string& veridianDGMPath, std::string
     retassure(*(uint64_t *) (_client->veridiandgmfwdata) != 0,
               "%s: failed to load Veridian for %s with the size %zu!\n",
               __func__, veridianDGMPath.c_str(), _client->veridiandgmfwdatasize);
-    veridianFWMFileStream.seekg(0, std::ios_base::end);
-    _client->veridianfwmfwdatasize = veridianFWMFileStream.tellg();
-    veridianFWMFileStream.seekg(0, std::ios_base::beg);
+    _client->veridianfwmfwdatasize = futurerestore::getFileSize(veridianFWMPath);
     retassure(_client->veridianfwmfwdata = (char *)alloc.allocate(_client->veridianfwmfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, veridianFWMPath.c_str());
     veridianFWMFileStream.read((char *) _client->veridianfwmfwdata,
@@ -2692,11 +2736,10 @@ void futurerestore::loadVeridian(const std::string& veridianDGMPath, std::string
 }
 
 void futurerestore::loadTimer(const std::string& timerPath) const {
-    std::ifstream timerFileStream(timerPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream timerFileStream(timerPath, std::ios::in | std::ios::binary);
     retassure(timerFileStream.good(), "%s: failed init file stream for %s!\n", __func__, timerPath.c_str());
-    _client->timerfwdatasize = timerFileStream.tellg();
-    _client->rtimerfwdatasize = timerFileStream.tellg();
-    timerFileStream.seekg(0, std::ios_base::beg);
+    _client->timerfwdatasize = futurerestore::getFileSize(timerPath);
+    _client->rtimerfwdatasize = futurerestore::getFileSize(timerPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->timerfwdata = (char *)alloc.allocate(_client->timerfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, timerPath.c_str());
@@ -2717,10 +2760,9 @@ void futurerestore::loadTimer(const std::string& timerPath) const {
 }
 
 void futurerestore::loadBaobab(const std::string& baobabPath) const {
-    std::ifstream baobobFileStream(baobabPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream baobobFileStream(baobabPath, std::ios::in | std::ios::binary);
     retassure(baobobFileStream.good(), "%s: failed init file stream for %s!\n", __func__, baobabPath.c_str());
-    _client->baobabfwdatasize = baobobFileStream.tellg();
-    baobobFileStream.seekg(0, std::ios_base::beg);
+    _client->baobabfwdatasize = futurerestore::getFileSize(baobabPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->baobabfwdata = (char *)alloc.allocate(_client->baobabfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, baobabPath.c_str());
@@ -2733,11 +2775,11 @@ void futurerestore::loadBaobab(const std::string& baobabPath) const {
 }
 
 void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std::string& cryptex1SysVOLPath, const std::string& cryptex1SysTCPath, const std::string& cryptex1AppOSPath, const std::string& cryptex1AppVOLPath, const std::string& cryptex1AppTCPath) const {
-    std::ifstream cryptex1SysOSFileStream(cryptex1SysOSPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1SysOSFileStream(cryptex1SysOSPath, std::ios::in | std::ios::binary);
     retassure(cryptex1SysOSFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysOSPath.c_str());
-    _client->cryptex1sysosdatasize = cryptex1SysOSFileStream.tellg();
-    cryptex1SysOSFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1sysosdatasize = futurerestore::getFileSize(cryptex1SysOSPath);
     std::allocator<uint8_t> alloc;
+
     retassure(_client->cryptex1sysosdata = (char *)alloc.allocate(_client->cryptex1sysosdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysOSPath.c_str());
     cryptex1SysOSFileStream.read((char *) _client->cryptex1sysosdata,
@@ -2747,10 +2789,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
               "%s: failed to load Cryptex1,SystemOS for %s with the size %zu!\n",
               __func__, cryptex1SysOSPath.c_str(), _client->cryptex1sysosdatasize);
 
-    std::ifstream cryptex1SysVOLFileStream(cryptex1SysVOLPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1SysVOLFileStream(cryptex1SysVOLPath, std::ios::in | std::ios::binary);
     retassure(cryptex1SysVOLFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysVOLPath.c_str());
-    _client->cryptex1sysvoldatasize = cryptex1SysVOLFileStream.tellg();
-    cryptex1SysVOLFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1sysvoldatasize = futurerestore::getFileSize(cryptex1SysVOLPath);
     retassure(_client->cryptex1sysvoldata = (char *)alloc.allocate(_client->cryptex1sysvoldatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysVOLPath.c_str());
     cryptex1SysVOLFileStream.read((char *) _client->cryptex1sysvoldata,
@@ -2760,10 +2801,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
               "%s: failed to load Cryptex1,SystemVolume for %s with the size %zu!\n",
               __func__, cryptex1SysVOLPath.c_str(), _client->cryptex1sysvoldatasize);
 
-    std::ifstream cryptex1SysTCFileStream(cryptex1SysTCPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1SysTCFileStream(cryptex1SysTCPath, std::ios::in | std::ios::binary);
     retassure(cryptex1SysTCFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1SysTCPath.c_str());
-    _client->cryptex1systcdatasize = cryptex1SysTCFileStream.tellg();
-    cryptex1SysTCFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1systcdatasize = futurerestore::getFileSize(cryptex1SysTCPath);
     retassure(_client->cryptex1systcdata = (char *)alloc.allocate(_client->cryptex1systcdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1SysTCPath.c_str());
     cryptex1SysTCFileStream.read((char *) _client->cryptex1systcdata,
@@ -2773,10 +2813,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
               "%s: failed to load Cryptex1,SystemTrustCache for %s with the size %zu!\n",
               __func__, cryptex1SysTCPath.c_str(), _client->cryptex1systcdatasize);
 
-    std::ifstream cryptex1AppOSFileStream(cryptex1AppOSPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1AppOSFileStream(cryptex1AppOSPath, std::ios::in | std::ios::binary);
     retassure(cryptex1AppOSFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppOSPath.c_str());
-    _client->cryptex1apposdatasize = cryptex1AppOSFileStream.tellg();
-    cryptex1AppOSFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1apposdatasize = futurerestore::getFileSize(cryptex1AppOSPath);
     retassure(_client->cryptex1apposdata = (char *)alloc.allocate(_client->cryptex1apposdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppOSPath.c_str());
     cryptex1AppOSFileStream.read((char *) _client->cryptex1apposdata,
@@ -2786,10 +2825,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
               "%s: failed to load Cryptex1,AppOS for %s with the size %zu!\n",
               __func__, cryptex1AppOSPath.c_str(), _client->cryptex1apposdatasize);
 
-    std::ifstream cryptex1AppVOLFileStream(cryptex1AppVOLPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1AppVOLFileStream(cryptex1AppVOLPath, std::ios::in | std::ios::binary);
     retassure(cryptex1AppVOLFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppVOLPath.c_str());
-    _client->cryptex1appvoldatasize = cryptex1AppVOLFileStream.tellg();
-    cryptex1AppVOLFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1appvoldatasize = futurerestore::getFileSize(cryptex1AppVOLPath);
     retassure(_client->cryptex1appvoldata = (char *)alloc.allocate(_client->cryptex1appvoldatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppVOLPath.c_str());
     cryptex1AppVOLFileStream.read((char *) _client->cryptex1appvoldata,
@@ -2799,10 +2837,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
               "%s: failed to load Cryptex1,AppVolume for %s with the size %zu!\n",
               __func__, cryptex1AppVOLPath.c_str(), _client->cryptex1appvoldatasize);
 
-    std::ifstream cryptex1AppTCFileStream(cryptex1AppTCPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream cryptex1AppTCFileStream(cryptex1AppTCPath, std::ios::in | std::ios::binary);
     retassure(cryptex1AppTCFileStream.good(), "%s: failed init file stream for %s!\n", __func__, cryptex1AppTCPath.c_str());
-    _client->cryptex1apptcdatasize = cryptex1AppTCFileStream.tellg();
-    cryptex1AppTCFileStream.seekg(0, std::ios_base::beg);
+    _client->cryptex1apptcdatasize = futurerestore::getFileSize(cryptex1AppTCPath);
     retassure(_client->cryptex1apptcdata = (char *)alloc.allocate(_client->cryptex1apptcdatasize),
               "%s: failed to allocate memory for %s\n", __func__, cryptex1AppTCPath.c_str());
     cryptex1AppTCFileStream.read((char *) _client->cryptex1apptcdata,
@@ -2816,10 +2853,9 @@ void futurerestore::loadCryptex1(const std::string& cryptex1SysOSPath, const std
 void futurerestore::loadYonkers(const std::array<std::string, 16>& yonkersPaths) const {
     int index = 0;
     for (const auto &yonkersPath: yonkersPaths) {
-        std::ifstream yonkersFileStream(yonkersPath, std::ios::in | std::ios::binary | std::ios::ate);
+        std::ifstream yonkersFileStream(yonkersPath, std::ios::in | std::ios::binary);
         retassure(yonkersFileStream.good(), "%s: failed init file stream for %s!\n", __func__, yonkersPath.c_str());
-        _client->yonkersfwdatasize[index] = yonkersFileStream.tellg();
-        yonkersFileStream.seekg(0, std::ios_base::beg);
+        _client->yonkersfwdatasize[index] = futurerestore::getFileSize(yonkersPath);
         std::allocator<uint8_t> alloc;
         retassure(_client->yonkersfwdata[index] = (char *)alloc.allocate(_client->yonkersfwdatasize[index]),
                   "%s: failed to allocate memory for %s\n", __func__, yonkersPath.c_str());
@@ -2834,10 +2870,9 @@ void futurerestore::loadYonkers(const std::array<std::string, 16>& yonkersPaths)
 }
 
 void futurerestore::loadRamdisk(const std::string& ramdiskPath) const {
-    std::ifstream ramdiskFileStream(ramdiskPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream ramdiskFileStream(ramdiskPath, std::ios::in | std::ios::binary);
     retassure(ramdiskFileStream.good(), "%s: failed init file stream for %s!\n", __func__, ramdiskPath.c_str());
-    _client->ramdiskdatasize = ramdiskFileStream.tellg();
-    ramdiskFileStream.seekg(0, std::ios_base::beg);
+    _client->ramdiskdatasize = futurerestore::getFileSize(ramdiskPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->ramdiskdata = (char *)alloc.allocate(_client->ramdiskdatasize),
               "%s: failed to allocate memory for %s\n", __func__, ramdiskPath.c_str());
@@ -2850,10 +2885,9 @@ void futurerestore::loadRamdisk(const std::string& ramdiskPath) const {
 }
 
 void futurerestore::loadKernel(const std::string& kernelPath) const {
-    std::ifstream kernelFileStream(kernelPath, std::ios::in | std::ios::binary | std::ios::ate);
+    std::ifstream kernelFileStream(kernelPath, std::ios::in | std::ios::binary);
     retassure(kernelFileStream.good(), "%s: failed init file stream for %s!\n", __func__, kernelPath.c_str());
-    _client->kerneldatasize = kernelFileStream.tellg();
-    kernelFileStream.seekg(0, std::ios_base::beg);
+    _client->kerneldatasize = futurerestore::getFileSize(kernelPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->kerneldata = (char *)alloc.allocate(_client->kerneldatasize),
               "%s: failed to allocate memory for %s\n", __func__, kernelPath.c_str());
@@ -2866,15 +2900,14 @@ void futurerestore::loadKernel(const std::string& kernelPath) const {
 }
 
 void futurerestore::loadSep(const std::string& sepPath) const {
-    std::ifstream sepFileStream(sepPath, std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream sepFileStream(sepPath, std::ios::binary | std::ios::in);
     retassure(sepFileStream.good(), "%s: failed init file stream for %s!\n", __func__, sepPath.c_str());
-    _client->sepfwdatasize = sepFileStream.tellg();
-    sepFileStream.seekg(0, std::ios_base::beg);
+    _client->sepfwdatasize = futurerestore::getFileSize(sepPath);
     std::allocator<uint8_t> alloc;
     retassure(_client->sepfwdata = (char *)alloc.allocate(_client->sepfwdatasize),
               "%s: failed to allocate memory for %s\n", __func__, sepPath.c_str());
     sepFileStream.read(reinterpret_cast<char*>(_client->sepfwdata),
-                          _client->sepfwdatasize);
+                          static_cast<std::streamsize>(_client->sepfwdatasize));
     retassure(sepFileStream.good(), "%s: failed to read file stream for %s!\n", __func__, sepPath.c_str());
     retassure(*(uint64_t *) (_client->sepfwdata) != 0,
               "%s: failed to load SEP for %s with the size %zu!\n",
@@ -2895,12 +2928,11 @@ void futurerestore::loadBaseband(const std::string& basebandPath) {
 }
 
 char *futurerestore::readBaseband(const std::string& basebandPath, char *data, size_t *sz) {
-    std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream basebandFileStream(basebandPath, std::ios::binary | std::ios::in);
     if(!basebandFileStream.good()) {
         return nullptr;
     }
-    size_t basebandSize = basebandFileStream.tellg();
-    basebandFileStream.seekg(0, std::ios_base::beg);
+    size_t basebandSize = futurerestore::getFileSize(basebandPath);
     uint64_t *basebandData = nullptr;
     std::allocator<uint8_t> alloc;
     basebandData = (uint64_t *)alloc.allocate(basebandSize);
@@ -2948,22 +2980,119 @@ unsigned char *futurerestore::getSHABuffer(char *data, size_t dataSize, int type
     return fileHash;
 }
 
+unsigned char *futurerestore::getSHABufferStream(std::ifstream &stream, int type) {
+  std::allocator<uint8_t> alloc;
+  auto *fileHash = (unsigned char *)nullptr;
+  const size_t bufferSize = 0x100000;
+  char *buffer = (char *)alloc.allocate(bufferSize);
+  switch(type) {
+  case 1:
+    fileHash = (unsigned char *) alloc.allocate(32);
+    memset(fileHash, 0, 32);
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+
+    while(stream.good()) {
+      stream.read(buffer, bufferSize);
+      std::streamsize bytesRead = stream.gcount();
+      if (bytesRead > 0) {
+        SHA256_Update(&sha256, buffer, bytesRead);
+      }
+    }
+    SHA256_Final(fileHash, &sha256);
+    break;
+  case 2:
+    fileHash = (unsigned char *) alloc.allocate(64);
+    memset(fileHash, 0, 64);
+    SHA512_CTX sha512;
+    SHA512_Init(&sha512);
+
+    while(stream.good()) {
+      stream.read(buffer, bufferSize);
+      std::streamsize bytesRead = stream.gcount();
+      if (bytesRead > 0) {
+        SHA512_Update(&sha512, buffer, bytesRead);
+      }
+    }
+    SHA512_Final(fileHash, &sha512);
+    break;
+  case 3:
+    fileHash = (unsigned char *) alloc.allocate(20);
+    memset(fileHash, 0, 20);
+    SHA_CTX sha1;
+    SHA1_Init(&sha1);
+
+    while(stream.good()) {
+      stream.read(buffer, bufferSize);
+      std::streamsize bytesRead = stream.gcount();
+      if (bytesRead > 0) {
+        SHA1_Update(&sha1, buffer, bytesRead);
+      }
+    }
+    SHA1_Final(fileHash, &sha1);
+    break;
+  default:
+    fileHash = (unsigned char *) alloc.allocate(48);
+    memset(fileHash, 0, 48);
+    SHA512_CTX sha384;
+    SHA384_Init(&sha384);
+
+    while(stream.good()) {
+      stream.read(buffer, bufferSize);
+      std::streamsize bytesRead = stream.gcount();
+      if (bytesRead > 0) {
+        SHA384_Update(&sha384, buffer, bytesRead);
+      }
+    }
+    SHA384_Final(fileHash, &sha384);
+    break;
+  }
+  free(buffer);
+  stream.seekg(0, std::ios::beg);
+  return fileHash;
+}
+
+size_t futurerestore::getFileSize(const std::string &name) {
+#ifdef WIN32
+    struct _stat64 st{0};
+    if(_stat64(name.c_str(), &st) < 0) {
+#else
+    struct stat st{0};
+    if(stat(name.c_str(), &st) < 0) {
+#endif
+        error("%s: failed to get file size for %s\n", __func__, name.c_str());
+        return 0;
+    }
+    return st.st_size;
+}
+
 unsigned char *futurerestore::getSHA(const std::string& filePath, int type) {
-    std::ifstream fileStream(filePath, std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream fileStream(filePath, std::ios::binary | std::ios::in);
     if(!fileStream.good()) {
         info("Cached %s not found, downloading a new one.\n", filePath.c_str());
         return nullptr;
     }
-    size_t dataSize = fileStream.tellg();
-    fileStream.seekg(0, std::ios_base::beg);
-    std::allocator<uint8_t> alloc;
-    char *data = nullptr;
-    if(!(data = (char *)alloc.allocate(dataSize))) {
-        error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
+    size_t dataSize = futurerestore::getFileSize(filePath);
+    if(!dataSize) {
+        error("%s: failed to get file size for %s\n", __func__, filePath.c_str());
         return nullptr;
     }
+    std::allocator<uint8_t> alloc;
+    char *data = nullptr;
+    try {
+      data = (char *) alloc.allocate(8);
+    } catch(std::bad_alloc const&) {
+        if(!data) {
+            error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
+            throw;
+        }
+    }
+    if(!data) {
+      error("%s: failed to allocate memory for %s\n", __func__, filePath.c_str());
+      return nullptr;
+    }
     fileStream.read((char *) data,
-                       (std::streamsize) dataSize);
+                       (std::streamsize) 8);
     if(!fileStream.good()) {
         info("Failed to read cached file %s, downloading a new one.\n", filePath.c_str());
         return nullptr;
@@ -2973,19 +3102,20 @@ unsigned char *futurerestore::getSHA(const std::string& filePath, int type) {
               __func__, filePath.c_str(), dataSize);
         return nullptr;
     }
-    return getSHABuffer(data, dataSize, type);
+    fileStream.seekg(0, std::ios::beg);
+    return getSHABufferStream(fileStream, type);
 }
 
 #pragma mark static methods
 
-inline void futurerestore::saveStringToFile(std::string str, std::string path) {
+inline void futurerestore::saveStringToFile(std::string &str, std::string &path) {
     if(str.empty() || path.empty()) {
-        info("%s: No data to save!", __func__);
+        info("%s: No data to save!\n", __func__);
         return;
     }
     std::ofstream fileStream(path, std::ios::out | std::ios::binary);
     retassure(fileStream.good(), "%s: failed init file stream for %s!\n", __func__, path.c_str());
-    fileStream.write(str.data(), str.length());
+    fileStream.write(str.data(), static_cast<std::streamsize>(str.length()));
     retassure((fileStream.good()), "Can't save file at %s\n", path.c_str());
 }
 
@@ -3285,11 +3415,11 @@ const char *futurerestore::extractZipFileToString(char *zip_buffer, const char *
     if(target_zip == nullptr) {
         return nullptr;
     } else {
-        int idx = zip_name_locate(target_zip, file, 0);
+        size_t idx = zip_name_locate(target_zip, file, 0);
         if(idx < 0) {
             return nullptr;
         } else {
-            struct zip_stat zstat;
+            struct zip_stat zstat{0};
             zip_stat_init(&zstat);
             if(zip_stat_index(target_zip, idx, 0, &zstat) != 0) {
                 return nullptr;
@@ -3317,7 +3447,7 @@ const char *futurerestore::extractZipFileToString(char *zip_buffer, const char *
     return (const char *)target_buffer;
 }
 
-bool futurerestore::is32bit() {
+bool futurerestore::is32bit() const {
     bool ret = !is_image4_supported(_client);
     if(_client) {
         dfu_client_free(_client);
