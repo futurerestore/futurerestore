@@ -19,7 +19,7 @@
     * [libinsn](https://github.com/tihmstar/libinsn);
     * [lzfse](https://github.com/lzfse/lzfse) (Linux/Windows only, macOS has built in libcompression);
     * [img4tool](https://github.com/tihmstar/img4tool);
-    * [liboffsetfinder64(fork))](https://github.com/Cryptiiiic/liboffsetfinder64);
+    * [libpatchfinder(fork))](https://github.com/Cryptiiiic/libpatchfinder);
     * [libipatcher(fork)](https://github.com/Cryptiiiic/libipatcher)
 
 * ## Submodules

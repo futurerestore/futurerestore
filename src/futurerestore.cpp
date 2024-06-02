@@ -668,22 +668,19 @@ void futurerestore::enterPwnRecovery(plist_t build_identity, std::string bootarg
         try {
             std::string board = getDeviceBoardNoCopy();
             info("Getting firmware keys for: %s\n", board.c_str());
-            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" ||
-                board == "n66map") {
+            if (board == "n71ap" || board == "n71map" || board == "n69ap" || board == "n69uap" || board == "n66ap" || board == "n66map") {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS",
-                                                           board);
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", _client->device->chip_id, board);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC",
-                                                           board);
+                  iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", _client->device->chip_id, board);
                 }
             } else {
                 if (!_noIBSS && !cache1) {
-                    iBSSKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBSS");
+                    iBSSKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBSS", _client->device->chip_id);
                 }
                 if (!cache2) {
-                    iBECKeys = libipatcher::getFirmwareKey(_client->device->product_type, _client->build, "iBEC");
+                    iBECKeys = libipatcher::getFirmwareKeyForComponent(_client->device->product_type, _client->build, "iBEC", _client->device->chip_id);
                 }
             }
         } catch (tihmstar::exception &e) {
@@ -953,9 +950,9 @@ void get_custom_component(struct idevicerestore_client_t *client, plist_t build_
 #else
     try {
         auto comp = getIPSWComponent(client, build_identity, component);
-        comp = std::move(libipatcher::decryptFile3((char *) comp.first, comp.second,
-                                              libipatcher::getFirmwareKey(client->device->product_type, client->build,
-                                                                          component)));
+        comp = std::move(libipatcher::decryptFile((char *) comp.first, comp.second,
+                                              libipatcher::getFirmwareKeyForComponent(client->device->product_type, client->build,
+                                                                          component, client->device->chip_id)));
         *data = (unsigned char *) (char *) comp.first;
         *size = comp.second;
         comp.first = NULL; //don't free on destruction
