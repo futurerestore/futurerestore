@@ -112,6 +112,7 @@ class futurerestore {
     bool _rerestoreiOS9 = false;
     //methods
     void enterPwnRecovery(plist_t build_identity, std::string bootargs);
+    void patchKernel(plist_t build_identity, std::string custom_seed = "");
 
 public:
     void test() const;
