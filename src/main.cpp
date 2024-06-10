@@ -86,52 +86,52 @@ static struct option longopts[] = {
 bool manual = false;
 
 void cmd_help(){
-    printf("Usage: futurerestore [OPTIONS] iPSW\n");
-    printf("Allows restoring to non-matching firmware with custom SEP+baseband\n");
-    printf("\nGeneral options:\n");
-    printf("  -h, --help\t\t\t\tShows this usage message\n");
-    printf("  -t, --apticket PATH\t\t\tSigning tickets used for restoring\n");
-    printf("  -u, --update\t\t\t\tUpdate instead of erase install (requires appropriate APTicket)\n");
-    printf("              \t\t\t\tDO NOT use this parameter, if you update from jailbroken firmware!\n");
-    printf("  -w, --wait\t\t\t\tKeep rebooting until ApNonce matches APTicket (ApNonce collision, unreliable)\n");
-    printf("  -d, --debug\t\t\t\tShow all code, use to save a log for debug testing\n");
-    printf("  -e, --exit-recovery\t\t\tExit recovery mode and quit\n");
-    printf("  -z, --no-restore\t\t\tDo not restore and end right before NOR data is sent\n");
-    printf("  -c, --custom-latest VERSION\t\tSpecify custom latest version to use for SEP, Baseband and other FirmwareUpdater components\n");
-    printf("  -g, --custom-latest-buildid BUILDID\tSpecify custom latest buildid to use for SEP, Baseband and other FirmwareUpdater components\n");
-    printf("  -i, --custom-latest-beta\t\tGet custom url from list of beta firmwares\n");
-    printf("  -k, --custom-latest-ota\t\tGet custom url from list of ota firmwares");
+    info("Usage: futurerestore [OPTIONS] iPSW\n");
+    info("Allows restoring to non-matching firmware with custom SEP+baseband\n");
+    info("\nGeneral options:\n");
+    info("  -h, --help\t\t\t\tShows this usage message\n");
+    info("  -t, --apticket PATH\t\t\tSigning tickets used for restoring\n");
+    info("  -u, --update\t\t\t\tUpdate instead of erase install (requires appropriate APTicket)\n");
+    info("              \t\t\t\tDO NOT use this parameter, if you update from jailbroken firmware!\n");
+    info("  -w, --wait\t\t\t\tKeep rebooting until ApNonce matches APTicket (ApNonce collision, unreliable)\n");
+    info("  -d, --debug\t\t\t\tShow all code, use to save a log for debug testing\n");
+    info("  -e, --exit-recovery\t\t\tExit recovery mode and quit\n");
+    info("  -z, --no-restore\t\t\tDo not restore and end right before NOR data is sent\n");
+    info("  -c, --custom-latest VERSION\t\tSpecify custom latest version to use for SEP, Baseband and other FirmwareUpdater components\n");
+    info("  -g, --custom-latest-buildid BUILDID\tSpecify custom latest buildid to use for SEP, Baseband and other FirmwareUpdater components\n");
+    info("  -i, --custom-latest-beta\t\tGet custom url from list of beta firmwares\n");
+    info("  -k, --custom-latest-ota\t\tGet custom url from list of ota firmwares");
 
 #ifdef HAVE_LIBIPATCHER
-    printf("\nOptions for downgrading with Odysseus:\n");
-    printf("  -3, --use-pwndfu\t\t\tRestoring devices with Odysseus method. Device needs to be in pwned DFU mode already\n");
-    printf("  -4, --no-ibss\t\t\t\tRestoring devices with Odysseus method. For checkm8/iPwnder32 specifically, bootrom needs to be patched already with unless iPwnder.\n");
-    printf("  -5, --rdsk PATH\t\t\tSet custom restore ramdisk for entering restoremode(requires use-pwndfu)\n");
-    printf("  -6, --rkrn PATH\t\t\tSet custom restore kernelcache for entering restoremode(requires use-pwndfu)\n");
-    printf("  -7, --set-nonce\t\t\tSet custom nonce from your blob then exit recovery(requires use-pwndfu)\n");
-    printf("  -7, --set-nonce=0xNONCE\t\tSet custom nonce then exit recovery(requires use-pwndfu)\n");
-    printf("  -8, --serial\t\t\t\tEnable serial during boot(requires serial cable and use-pwndfu)\n");
-    printf("  -9, --boot-args\t\t\tSet custom restore boot-args(PROCEED WITH CAUTION)(requires use-pwndfu)\n");
-    printf("  -a, --no-cache\t\t\tDisable cached patched iBSS/iBEC(requires use-pwndfu)\n");
-    printf("  -f, --skip-blob\t\t\tSkip SHSH blob validation(PROCEED WITH CAUTION)(requires use-pwndfu)\n");
+    info("\nOptions for downgrading with PWNDFU(libpatchfinder):\n");
+    info("  -3, --use-pwndfu\t\t\tRestoring devices with PWNDFU(libpatchfinder) method. Device needs to be in pwned DFU mode already\n");
+    info("  -4, --no-ibss\t\t\t\tRestoring devices with PWNDFU(libpatchfinder) method. For checkm8/iPwnder32 specifically, bootrom needs to be patched already with unless iPwnder.\n");
+    info("  -5, --rdsk PATH\t\t\tSet custom restore ramdisk for entering restoremode(requires use-pwndfu)\n");
+    info("  -6, --rkrn PATH\t\t\tSet custom restore kernelcache for entering restoremode(requires use-pwndfu)\n");
+    info("  -7, --set-nonce\t\t\tSet custom nonce from your blob then exit recovery(requires use-pwndfu)\n");
+    info("  -7, --set-nonce=0xNONCE\t\tSet custom nonce then exit recovery(requires use-pwndfu)\n");
+    info("  -8, --serial\t\t\t\tEnable serial during boot(requires serial cable and use-pwndfu)\n");
+    info("  -9, --boot-args\t\t\tSet custom restore boot-args(PROCEED WITH CAUTION)(requires use-pwndfu)\n");
+    info("  -a, --no-cache\t\t\tDisable cached patched iBSS/iBEC(requires use-pwndfu)\n");
+    info("  -f, --skip-blob\t\t\tSkip SHSH blob validation(PROCEED WITH CAUTION)(requires use-pwndfu)\n");
 #endif
 
-    printf("\nOptions for SEP:\n");
-    printf("  -0, --latest-sep\t\t\tUse latest signed SEP instead of manually specifying one\n");
+    info("\nOptions for SEP:\n");
+    info("  -0, --latest-sep\t\t\tUse latest signed SEP instead of manually specifying one\n");
     if(manual) {
-        printf("  -s, --sep PATH\t\t\tSEP to be flashed\n");
-        printf("  -m, --sep-manifest PATH\t\tBuildManifest for requesting SEP ticket\n");
+        info("  -s, --sep PATH\t\t\tSEP to be flashed\n");
+        info("  -m, --sep-manifest PATH\t\tBuildManifest for requesting SEP ticket\n");
     }
-    printf("  -j, --no-rsep\t\t\t\tChoose not to send Restore Mode SEP firmware command\n");
+    info("  -j, --no-rsep\t\t\t\tChoose not to send Restore Mode SEP firmware command\n");
 
-    printf("\nOptions for baseband:\n");
-    printf("  -1, --latest-baseband\t\t\tUse latest signed baseband instead of manually specifying one\n");
+    info("\nOptions for baseband:\n");
+    info("  -1, --latest-baseband\t\t\tUse latest signed baseband instead of manually specifying one\n");
     if(manual) {
-        printf("  -b, --baseband PATH\t\t\tBaseband to be flashed\n");
-        printf("  -p, --baseband-manifest PATH\t\tBuildManifest for requesting baseband ticket\n");
+        info("  -b, --baseband PATH\t\t\tBaseband to be flashed\n");
+        info("  -p, --baseband-manifest PATH\t\tBuildManifest for requesting baseband ticket\n");
     }
-    printf("  -2, --no-baseband\t\t\tSkip checks and don't flash baseband\n");
-    printf("                   \t\t\tOnly use this for device without a baseband (eg. iPod touch or some Wi-Fi only iPads)\n\n");
+    info("  -2, --no-baseband\t\t\tSkip checks and don't flash baseband\n");
+    info("                   \t\t\tOnly use this for device without a baseband (eg. iPod touch or some Wi-Fi only iPads)\n\n");
 }
 
 using namespace std;
@@ -144,14 +144,14 @@ int main_r(int argc, const char * argv[]) {
         SetConsoleMode(handle, termFlags | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #endif
     int err=0;
-    printf("Version: " VERSION_RELEASE "(" VERSION_COMMIT_SHA "-" VERSION_COMMIT_COUNT ")\n");
-    printf("%s\n",tihmstar::img4tool::version());
+    info("Version: " VERSION_RELEASE "(" VERSION_COMMIT_SHA "-" VERSION_COMMIT_COUNT ")\n");
+    info("%s\n",tihmstar::img4tool::version());
 #ifdef HAVE_LIBIPATCHER
-    printf("%s\n",libipatcher::version());
-    printf("Odysseus for 32-bit support: yes\n");
-    printf("Odysseus for 64-bit support: %s\n",(libipatcher::has64bitSupport() ? "yes" : "no"));
+    info("%s\n",libipatcher::version());
+    info("PWNDFU(libpatchfinder) for 32-bit support: yes\n");
+    info("PWNDFU(libpatchfinder) for 64-bit support: %s\n",(libipatcher::has64bitSupport() ? "yes" : "no"));
 #else
-    printf("Odysseus support: no\n");
+    info("PWNDFU(libpatchfinder) support: no\n");
 #endif
 
     int optindex = 0;
@@ -310,7 +310,7 @@ int main_r(int argc, const char * argv[]) {
         error("argument parsing failed! agrc=%d optind=%d\n",argc,optind);
         if (idevicerestore_debug){
             for (int i=0; i<argc; i++) {
-                printf("argv[%d]=%s\n",i,argv[i]);
+                info("argv[%d]=%s\n",i,argv[i]);
             }
         }
         return -5;
@@ -319,7 +319,7 @@ int main_r(int argc, const char * argv[]) {
     futurerestore client(flags & FLAG_UPDATE, flags & FLAG_IS_PWN_DFU, flags & FLAG_NO_IBSS, flags & FLAG_SET_NONCE, flags & FLAG_SERIAL, flags & FLAG_NO_RESTORE_FR, flags & FLAG_NO_RSEP_FR);
     retassure(client.init(),"can't init, no device found\n");
 
-    printf("futurerestore init done\n");
+    info("futurerestore init done\n");
     if(flags & FLAG_NO_IBSS)
         retassure((flags & FLAG_IS_PWN_DFU),"--no-ibss requires --use-pwndfu\n");
     if(flags & FLAG_RESTORE_RAMDISK)
@@ -358,6 +358,11 @@ int main_r(int argc, const char * argv[]) {
     try {
         if (!apticketPaths.empty()) {
             client.loadAPTickets(apticketPaths);
+        } else {
+          err = -__LINE__;
+          error("-t <blob.shsh2> is required!\n");
+          error("Fail code=%d\n",err);
+          goto error;
         }
 
         if(!customLatest.empty()) {
@@ -417,11 +422,15 @@ int main_r(int argc, const char * argv[]) {
             if (flags & FLAG_LATEST_SEP) {
                 info("User specified to use latest signed SEP\n");
                 client.downloadLatestSep();
-            } else if (!client.is32bit()) {
+            } else if (!client.is32bit() && manual) {
                 client.setSepPath(sepPath);
                 client.setSepManifestPath(sepManifestPath);
                 client.loadSep(sepPath);
                 client.loadSepManifest(sepManifestPath);
+            } else if (!client.is32bit() && !manual) {
+              err = -__LINE__;
+              error("Fail code=%d\n",err);
+              goto error;
             }
         }
         if(flags & FLAG_IGNORE_BB_FAIL) {
@@ -454,12 +463,16 @@ int main_r(int argc, const char * argv[]) {
                 if (flags & FLAG_LATEST_BASEBAND) {
                     info("User specified to use latest signed baseband\n");
                     client.downloadLatestBaseband();
-                } else {
+                } else if(manual) {
                     client.setBasebandPath(basebandPath);
                     client.setBasebandManifestPath(basebandManifestPath);
                     client.loadBaseband(basebandPath);
                     client.loadBasebandManifest(basebandManifestPath);
                     info("Did set SEP and baseband path and firmware\n");
+                } else if(!manual) {
+                  err = -__LINE__;
+                  error("Fail code=%d\n", err);
+                  goto error;
                 }
             }
 
@@ -467,7 +480,7 @@ int main_r(int argc, const char * argv[]) {
             if (!(devVals.bbgcid = client.getBasebandGoldCertIDFromDevice())){
                 debug("[WARNING] using tsschecker's fallback to get BasebandGoldCertID. This might result in invalid baseband signing status information\n");
             }
-            if(!(flags & FLAG_SET_NONCE)) {
+            if(!(flags & FLAG_SET_NONCE) && !(flags & FLAG_NO_BASEBAND)) {
                 info("Checking if Baseband is being signed...\n");
                 if (!(isManifestSignedForDevice(client.getBasebandManifestPath().c_str(), &devVals, &versVals,
                                                 nullptr))) {
@@ -486,21 +499,21 @@ int main_r(int argc, const char * argv[]) {
         }
     } catch (int error) {
         err = error;
-        printf("[Error] Fail code=%d\n",err);
+        error("Fail code=%d\n",err);
         goto error;
     }
 
     try {
         client.doRestore(ipsw);
-        printf("Done: restoring succeeded!\n");
+        info("Done: restoring succeeded!\n");
     } catch (tihmstar::exception &e) {
         e.dump();
-        printf("Done: restoring failed!\n");
+        info("Done: restoring failed!\n");
     }
 
     error:
     if (err){
-        printf("Failed with error code=%d\n",err);
+        info("Failed with error code=%d\n",err);
     }
     return err;
 #undef reterror
@@ -513,7 +526,7 @@ int main(int argc, const char * argv[]) {
     try {
         return main_r(argc, argv);
     } catch (tihmstar::exception &e) {
-        printf("%s: failed with exception:\n",PACKAGE_NAME);
+        error("%s: failed with exception:\n",PACKAGE_NAME);
         e.dump();
         return e.code();
     }

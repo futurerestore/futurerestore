@@ -155,6 +155,7 @@ using namespace tihmstar;
 extern "C" {
 void irecv_event_cb(const irecv_device_event_t *event, void *userdata);
 void idevice_event_cb(const idevice_event_t *event, void *userdata);
+int received_cb(irecv_client_t client, const irecv_event_t* event);
 }
 
 #pragma mark futurerestore
@@ -984,7 +985,7 @@ void futurerestore::patchKernel(plist_t build_identity, std::string custom_seed)
 
     /* Patch kernel */
     if (!cache) {
-      if(_client->build_major < 14) {
+      if (_client->build_major < 14) {
         try {
           std::string board = getDeviceBoardNoCopy();
           info("Getting firmware keys for: %s\n", board.c_str());
@@ -1007,12 +1008,16 @@ void futurerestore::patchKernel(plist_t build_identity, std::string custom_seed)
                    e.code(), e.what());
         }
       }
-    }
-
-    if (!kernel.first) {
+      if (!kernel.first) {
         info("Patching kernel\n");
-        kernel = getIPSWComponent(_client, build_identity, "KernelCache");
-        kernel = std::move(libipatcher::patchKernel((char *) kernel.first, kernel.second, kernelKeys, custom_seed));
+        if(_client->kerneldata && _client->kerneldatasize) {
+          kernel = std::make_pair(_client->kerneldata, _client->kerneldatasize);
+        } else {
+          kernel = getIPSWComponent(_client, build_identity, "KernelCache");
+        }
+        kernel = std::move(libipatcher::patchKernel(
+            (char *)kernel.first, kernel.second, kernelKeys, custom_seed));
+      }
     }
 
 //    if (_client->image4supported) {
@@ -1312,39 +1317,49 @@ void futurerestore::doRestore(const char *ipsw) {
 
     //check for enterpwnrecovery, because we Could be in DFU mode
     if (_enterPwnRecoveryRequested) {
-        retassure((getDeviceMode(true) == _MODE_DFU) || (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
-                  "unexpected device mode\n");
-        if(client->irecv_e_ctx) {
-            irecv_device_event_unsubscribe(client->irecv_e_ctx);
+      retassure((getDeviceMode(true) == _MODE_DFU) ||
+                    (getDeviceMode(false) == _MODE_RECOVERY && _noIBSS),
+                "unexpected device mode\n");
+      if (client->irecv_e_ctx) {
+        irecv_device_event_unsubscribe(client->irecv_e_ctx);
+      }
+      if (client->idevice_e_ctx != nullptr) {
+        client->idevice_e_ctx = nullptr;
+      }
+      std::string bootargs;
+      if (_boot_args != nullptr) {
+        bootargs = _boot_args;
+      } else {
+        if (_serial) {
+          bootargs.append("serial=0x3 ");
         }
-        if(client->idevice_e_ctx != nullptr) {
-            client->idevice_e_ctx = nullptr;
+        bootargs.append("rd=md0 ");
+        if (!_isUpdateInstall) {
+          bootargs.append("nand-enable-reformat=0x1 ");
         }
-        std::string bootargs;
-        if (_boot_args != nullptr) {
-            bootargs = _boot_args;
-        } else {
-            if (_serial) {
-                bootargs.append("serial=0x3 ");
-            }
-            bootargs.append("rd=md0 ");
-            if (!_isUpdateInstall) {
-                bootargs.append("nand-enable-reformat=0x1 ");
-            }
-            bootargs.append(
-                    "-v -restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+        bootargs.append(
+            "-v -restore debug=0x2014e keepsyms=0x1 amfi=0xff amfi_allow_any_signature=0x1 amfi_get_out_of_my_way=0x1 cs_enforcement_disable=0x1");
+      }
+      auto custom_seed = std::getenv("FUTURERESTORE_CUSTOM_CRYPTEX_SEED");
+      if(_client->build_major > 19) {
+        if (custom_seed) {
+          if(strlen(custom_seed) >= 32 ) {
+            patchKernel(build_identity, custom_seed);
+          } else {
+            patchKernel(build_identity, "0x11111111111111111111111111111111");
+          }
         }
-        patchKernel(build_identity, std::getenv("FUTURERESTORE_CUSTOM_CRYPTEX_SEED"));
-        enterPwnRecovery(build_identity, bootargs);
-        if(_client->irecv_e_ctx) {
-            irecv_device_event_unsubscribe(_client->irecv_e_ctx);
-        }
-        if(_client->idevice_e_ctx != nullptr) {
-            _client->idevice_e_ctx = nullptr;
-        }
-        irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, _client);
-        idevice_event_subscribe(idevice_event_cb, client);
-        client->idevice_e_ctx = (void *) idevice_event_cb;
+      }
+      enterPwnRecovery(build_identity, bootargs);
+      if(_client->irecv_e_ctx) {
+          irecv_device_event_unsubscribe(_client->irecv_e_ctx);
+      }
+      if(_client->idevice_e_ctx != nullptr) {
+          _client->idevice_e_ctx = nullptr;
+      }
+      irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, _client);
+      idevice_event_subscribe(idevice_event_cb, client);
+      client->idevice_e_ctx = (void *) idevice_event_cb;
     }
 
     // Get filesystem name from build identity
@@ -1563,8 +1578,12 @@ void futurerestore::doRestore(const char *ipsw) {
             info("[WARNING] Setting bgcolor to green! If you don't see a green screen, then your device didn't boot iBEC correctly\n");
             sleep(2); //show the user a green screen!
         }
-
-        retassure(!recovery_enter_restore(client, build_identity), "ERROR: Unable to place device into restore mode\n");
+        irecv_event_subscribe(client->recovery->client, IRECV_RECEIVED, &received_cb, nullptr);
+        auto tmpRet = recovery_enter_restore(client, build_identity);
+        if(tmpRet) {
+          irecv_receive(client->recovery->client);
+        }
+        retassure(!tmpRet, "ERROR: Unable to place device into restore mode\n");
 
         recovery_client_free(client);
     }
