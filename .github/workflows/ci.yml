@@ -1,4 +1,7 @@
-Linux:
+name: CI
+
+jobs:
+  Linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,6 +19,8 @@ Linux:
 
           echo "Workspace: ${{ github.workspace }}"
           echo "Repository: ${REPO_NAME}"
+
+          mkdir -p "${{ github.workspace }}/.github/workflows"
 
           docker run --rm \
             -v "${{ github.workspace }}/..:/tmp/Builder/repos" \
@@ -36,8 +41,6 @@ Linux:
 
               echo 'Running linux-post.sh'
               \"\$REPO/.github/workflows/linux-post.sh\"
-
-              mkdir -p \"\$REPO/.github/workflows\"
             "
 
       - name: Show Linux Build Output
