@@ -251,3 +251,49 @@ files, `install/`, Homebrew libraries, and PATH symlink were retained.
 
 Rebuilding now requires recreating the cleaned dependencies and build tree.
 See also the upstream [compilation guide](COMPILING.md).
+
+## 6. Persistent PR notification watcher
+
+The local macOS watcher for upstream PR #189 is saved under `tools/pr-watch/`:
+
+- `watch.py`: polls GitHub through the authenticated `gh` CLI and sends macOS
+  notifications for PR status, merge status, comment, review, and CI changes.
+- `dev.local.futurerestore-pr-189.plist`: per-user LaunchAgent configured to run
+  once at load and every 60 seconds in a logged-in graphical session.
+- `.gitignore`: excludes runtime state, locks, logs, and Python bytecode.
+
+These files are a snapshot of this machine's installed configuration, not a
+portable installer. They target `futurerestore/futurerestore#189`, use
+`/opt/homebrew/bin/gh` and `/opt/homebrew/bin/python3`, and reference
+`/Users/Apple`. Adapt those settings before installing elsewhere.
+
+The live script is installed at
+`/Users/Apple/Library/Application Support/FuturerestorePRWatch/watch.py`; the
+active plist is in `/Users/Apple/Library/LaunchAgents/`. Repository copies do
+not replace the live files automatically. Do not load both copies.
+
+The watcher stores only comment fingerprints, not comment bodies or credentials.
+It saves a baseline on its first successful check, suppresses duplicate alerts,
+and retries failed API/notification calls at the next interval. Notifications
+depend on macOS permissions and Focus settings; polling requires network access
+and an awake Mac. Existing GitHub CLI authentication must remain available.
+State files, logs, lock files, and the installed futurerestore binary are not
+included in the commit.
+
+Validate the saved configuration without querying GitHub or sending alerts:
+
+```sh
+python3 /Users/Apple/futurerestore/tools/pr-watch/watch.py --self-test
+plutil -lint /Users/Apple/futurerestore/tools/pr-watch/dev.local.futurerestore-pr-189.plist
+```
+
+Inspect or stop the live job:
+
+```sh
+launchctl print "gui/$(id -u)/dev.local.futurerestore-pr-189"
+launchctl bootout "gui/$(id -u)/dev.local.futurerestore-pr-189"
+```
+
+`bootout` stops the job for the current session; the installed LaunchAgent file
+will load again at the next login unless it is removed or disabled. None of
+these watcher operations posts comments or modifies the PR.
