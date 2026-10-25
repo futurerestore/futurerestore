@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+state.json
+state.tmp
+watch.lock
+watcher.log
+watcher-error.log
